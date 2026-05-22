@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: zita_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: zita_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # --- NUEVO: EL ORQUESTADOR N8N ---
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: zita_n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=America/Guayaquil # Ajustado a tu zona horaria para los timestamps de los pedidos
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - db # Obliga a Docker a encender primero la BDD y luego n8n
+
+volumes:
+  pgdata:
+  n8n_data: # Nuevo volumen para guardar los flujos de n8n
