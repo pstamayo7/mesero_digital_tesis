@@ -8,4 +8,5 @@ class ItemPedido(BaseModel):
     modificaciones: Optional[str] = Field(default="", description="Notas o excepciones (ej. sin cebolla, sin hielo, extra tostado)")
 
 class OrdenEstructurada(BaseModel):
+    respuesta_mesero: str = Field(description="Frase corta, amigable y natural confirmando la acción realizada.")
     pedidos: List[ItemPedido]

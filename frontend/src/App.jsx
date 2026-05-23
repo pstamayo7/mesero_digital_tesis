@@ -11,7 +11,7 @@ function App() {
   const audioChunksRef = useRef([])
   const [transcripcion, setTranscripcion] = useState("")
   
-  // 1. NUEVO: Estado para almacenar la orden estructurada (El carrito)
+  // Estado para almacenar la orden estructurada (El carrito)
   const [carrito, setCarrito] = useState([])
 
   // Cargar el menú al inicio
@@ -19,7 +19,6 @@ function App() {
     fetch('http://127.0.0.1:8000/menu')
       .then(respuesta => respuesta.json())
       .then(datos => {
-        // Asumiendo que tu JSON tiene una llave "categorias"
         setMenu(datos.categorias || []) 
         setCargando(false)
       })
@@ -43,36 +42,63 @@ function App() {
       }
 
       mediaRecorderRef.current.onstop = async () => {
-        // --- NUEVO ESCUDO: Si no hay audio, no enviamos nada ---
         if (audioChunksRef.current.length === 0) {
           console.warn("⚠️ Audio demasiado corto o vacío. No se enviará.");
           setGrabando(false);
           return;
         }
+        
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
         const formData = new FormData()
         formData.append("audio", audioBlob, "pedido.webm")
+        
+        // 1. INYECTAMOS LA MEMORIA: Enviamos el estado actual del carrito al LLM
+        formData.append("carrito_actual", JSON.stringify(carrito))
 
         try {
-          console.log("Enviando audio al servidor...")
+          console.log("Enviando audio y memoria al servidor...")
+          
           const respuesta = await fetch("http://127.0.0.1:8000/pedido-voz", {
             method: "POST",
             body: formData,
+            // IMPORTANTE: No se pone Content-Type manual cuando usamos FormData con archivos
           })
           
-          const resultado = await respuesta.json()
-          console.log("Respuesta del servidor:", resultado)
-          
-          setTranscripcion(resultado.transcripcion)
-          
-          // 2. NUEVO: Extraemos los pedidos de la IA y los metemos al carrito visual
-          if (resultado.orden && resultado.orden.pedidos) {
-            setCarrito(carritoActual => [...carritoActual, ...resultado.orden.pedidos])
+          if (respuesta.ok) {
+            // 2. EXTRAER METADATOS DESDE LOS HEADERS
+            const ordenJsonStr = respuesta.headers.get("X-Orden-JSON");
+            const transcripcionHeader = respuesta.headers.get("X-Transcripcion");
+            
+            if (transcripcionHeader) {
+              // Convertimos caracteres especiales si es necesario (manejo de tildes)
+              setTranscripcion(decodeURIComponent(escape(transcripcionHeader)));
+            }
+            
+            if (ordenJsonStr) {
+              const nuevaOrden = JSON.parse(ordenJsonStr);
+              console.log("Nuevo estado del carrito:", nuevaOrden);
+              // REEMPLAZAMOS el carrito porque el LLM ya procesó las sumas/restas
+              setCarrito(nuevaOrden.pedidos || []); 
+            }
+            
+            // 3. EXTRAER EL AUDIO DE LA RESPUESTA Y REPRODUCIRLO (Edge AI TTS)
+            const audioBlobResponse = await respuesta.blob();
+            const audioUrl = URL.createObjectURL(audioBlobResponse);
+            const audioMesero = new Audio(audioUrl);
+            
+            // ¡El mesero habla!
+            audioMesero.play();
+            
+          } else {
+            // Si el servidor mandó un código de error
+            const errorData = await respuesta.json();
+            console.error("Error de la IA:", errorData);
+            alert("El mesero digital no pudo procesar la solicitud.");
           }
           
         } catch (error) {
           console.error("Error al enviar el audio:", error)
-          alert("Hubo un error al enviar el audio al servidor.")
+          alert("Hubo un error de conexión al enviar el audio.")
         }
       }
 
@@ -92,12 +118,11 @@ function App() {
     }
   }
 
-  // 3. NUEVO: Función real para enviar a n8n mediante FastAPI
+  // Función real para enviar a n8n mediante FastAPI
   const confirmarOrden = async () => {
     try {
-      // Empaquetamos el carrito y calculamos un total básico para la base de datos
       const payloadOrden = {
-        id_mesa: 1, // Simulamos que es la mesa 1 o el kiosko principal
+        id_mesa: 1, 
         pedidos: carrito
       }
 
@@ -145,7 +170,7 @@ function App() {
         </div>
       )}
 
-      {/* 4. NUEVO: Renderizado del Carrito de Compras en pantalla */}
+      {/* Renderizado del Carrito de Compras en pantalla */}
       {carrito.length > 0 && (
         <div className="carrito-contenedor" style={{ background: '#f8f9fa', padding: '20px', borderRadius: '10px', margin: '20px 0', border: '2px solid #28a745' }}>
           <h2>🛒 Resumen de tu Pedido</h2>
