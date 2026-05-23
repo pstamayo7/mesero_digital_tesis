@@ -13,6 +13,7 @@ function App() {
   
   // Estado para almacenar la orden estructurada (El carrito)
   const [carrito, setCarrito] = useState([])
+  const [tiempoEstimado, setTiempoEstimado] = useState(null)
 
   // Cargar el menú al inicio
   useEffect(() => {
@@ -27,7 +28,22 @@ function App() {
         setCargando(false)
       })
   }, [])
-
+  useEffect(() => {
+    if (carrito.length > 0) {
+      fetch('http://127.0.0.1:8000/estimar-tiempo', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(carrito)
+      })
+      .then(res => res.json())
+      .then(data => {
+        setTiempoEstimado(data.tiempo_estimado_minutos);
+      })
+      .catch(err => console.error("Error estimando tiempo:", err));
+    } else {
+      setTiempoEstimado(null);
+    }
+  }, [carrito]);
   // Función para empezar a escuchar
   const iniciarGrabacion = async () => {
     try {
@@ -185,6 +201,13 @@ function App() {
                 )}
               </li>
             ))}
+            {tiempoEstimado && (
+            <div style={{ background: '#e9ecef', padding: '10px', borderRadius: '5px', marginBottom: '15px', textAlign: 'center' }}>
+              <span style={{ fontSize: '1.2rem', color: '#495057' }}>
+                ⏱️ Tiempo estimado de preparación: <strong>{tiempoEstimado} minutos</strong>
+              </span>
+            </div>
+          )}
           </ul>
           <button 
             onClick={confirmarOrden}

@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import rutas_menu, rutas_voz, rutas_ordenes
+from app.api import rutas_menu, rutas_voz, rutas_ordenes, rutas_tiempos
 
 app = FastAPI(title="API Mesero Digital - Doña Zita")
 
@@ -20,6 +21,7 @@ app.add_middleware(
 app.include_router(rutas_menu.router, tags=["Menú"])
 app.include_router(rutas_voz.router, tags=["Inteligencia Artificial"])
 app.include_router(rutas_ordenes.router, tags=["Orquestación"])
+app.include_router(rutas_tiempos.router, tags=["Gestión Operativa"])
 
 @app.get("/", tags=["Estado"])
 def ruta_raiz():
