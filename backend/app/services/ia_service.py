@@ -55,16 +55,19 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
     🛒 CARRITO ACTUAL DEL CLIENTE (Memoria):
     {carrito_actual}
     
-    REGLAS ESTRICTAS:
+    REGLAS LÓGICAS Y DE COMPORTAMIENTO:
     1. Analiza el 'Carrito Actual' y el 'Texto del Cliente'. Suma, resta o elimina productos según lo pida.
     2. Mapea siempre al nombre EXACTO del menú. Ignora lo que no esté en el menú.
-    3. Redacta una 'respuesta_mesero' corta, cálida y directa (Ej: "¡Claro! Te he quitado la cebolla de la fritada. ¿Deseas agregar algo de beber?").
+    3. Redacta una 'respuesta_mesero' corta, cálida y directa confirmando la acción.
+    4. Si el 'numero_mesa' en el carrito actual es 0, incluye en tu 'respuesta_mesero' una frase pidiendo amablemente al cliente que tome un número de la canasta y te lo dicte.
+    5. Si el cliente menciona el número que tomó, guárdalo numéricamente en 'numero_mesa'.
     
-    Tu respuesta debe ser EXCLUSIVAMENTE este JSON:
+    Tu respuesta debe ser EXCLUSIVAMENTE este JSON válido:
     {{
         "respuesta_mesero": "tu respuesta hablada aquí",
+        "numero_mesa": 0,
         "pedidos": [
-            {{ "plato": "nombre exacto", "cantidad": 1, "modificaciones": "" }}
+            {{ "plato": "nombre exacto", "cantidad": 1, "modificaciones": "notas extras" }}
         ]
     }}
     

@@ -1,0 +1,128 @@
+
+
+-- =========================================================
+-- .1 CREACIÓN DE TIPOS ENUMERADOS
+-- =========================================================
+CREATE TYPE estado_mesa_enum AS ENUM ('LIBRE', 'OCUPADA', 'RESERVADA');
+CREATE TYPE estado_pago_enum AS ENUM ('PENDIENTE', 'PAGADO');
+CREATE TYPE estado_item_enum AS ENUM ('SOLICITADO', 'PREPARANDO', 'ENTREGADO', 'CANCELADO');
+CREATE TYPE tipo_mod_enum AS ENUM ('EXTRA', 'SIN', 'CAMBIO');
+
+-- =========================================================
+-- 2. CREACIÓN DE TABLAS DE INFRAESTRUCTURA Y CATÁLOGO
+-- =========================================================
+CREATE TABLE Mesa (
+    id_mesa SERIAL PRIMARY KEY,
+    numero_mesa INT NOT NULL,
+    capacidad INT NOT NULL,
+    estado_mesa estado_mesa_enum DEFAULT 'LIBRE'
+);
+
+CREATE TABLE Categoria (
+    id_categoria SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL
+);
+
+CREATE TABLE Plato (
+    id_plato SERIAL PRIMARY KEY,
+    id_categoria INT REFERENCES Categoria(id_categoria),
+    nombre VARCHAR(100) NOT NULL,
+    precio_base DECIMAL(6,2) NOT NULL,
+    tiempo_prep_min INT
+);
+
+CREATE TABLE Ingrediente (
+    id_ingrediente SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL,
+    stock_actual DECIMAL(8,2) NOT NULL,
+    precio_extra DECIMAL(5,2) DEFAULT 0.00
+);
+
+CREATE TABLE Receta (
+    id_plato INT REFERENCES Plato(id_plato),
+    id_ingrediente INT REFERENCES Ingrediente(id_ingrediente),
+    cantidad_base DECIMAL(8,2) NOT NULL,
+    PRIMARY KEY (id_plato, id_ingrediente)
+);
+
+-- =========================================================
+-- 3. CREACIÓN DE TABLAS TRANSACCIONALES
+-- =========================================================
+CREATE TABLE Pedido (
+    id_pedido SERIAL PRIMARY KEY,
+    id_mesa INT REFERENCES Mesa(id_mesa), -- Actúa como el número de paleta física del Kiosko
+    fecha_apertura TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_cierre TIMESTAMP,
+    estado_pago estado_pago_enum DEFAULT 'PENDIENTE',
+    subtotal DECIMAL(8,2) DEFAULT 0.00,
+    total_final DECIMAL(8,2) DEFAULT 0.00
+);
+
+CREATE TABLE Detalle_Pedido (
+    id_detalle SERIAL PRIMARY KEY,
+    id_pedido INT REFERENCES Pedido(id_pedido),
+    id_plato INT REFERENCES Plato(id_plato),
+    cantidad INT NOT NULL,
+    fecha_solicitud TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado_item estado_item_enum DEFAULT 'SOLICITADO',
+    especificaciones_ia TEXT,
+    fecha_inicio_preparacion TIMESTAMP NULL -- Columna del Sprint 5 para cronómetros dinámicos
+);
+
+CREATE TABLE Modificacion_Item (
+    id_modificacion SERIAL PRIMARY KEY,
+    id_detalle INT REFERENCES Detalle_Pedido(id_detalle),
+    id_ingrediente INT REFERENCES Ingrediente(id_ingrediente),
+    tipo tipo_mod_enum NOT NULL,
+    recargo DECIMAL(5,2) DEFAULT 0.00
+);
+
+-- =========================================================
+-- 4. INSERCIÓN DE DATOS SEMILLA (MENÚ, INGREDIENTES Y RECETAS)
+-- =========================================================
+
+-- Categorías
+INSERT INTO Categoria (nombre) VALUES ('Platos Fuertes'), ('Bebidas');
+
+-- Platos Maestros
+INSERT INTO Plato (id_categoria, nombre, precio_base, tiempo_prep_min) VALUES 
+(1, 'Fritada Tradicional', 6.50, 15),
+(1, 'Fritada Especial Doble', 9.00, 18),
+(1, 'Llapingachos', 4.00, 10),
+(2, 'Cola Grande', 1.50, 1);
+
+-- Inventario Base de Ingredientes (Manejo de Stock en kilogramos o unidades)
+INSERT INTO Ingrediente (nombre, stock_actual, precio_extra) VALUES 
+('Carne de Cerdo (kg)', 50.00, 0.00),
+('Mote Cocinado (kg)', 30.00, 0.50),
+('Tostado (kg)', 20.00, 0.40),
+('Plátano Maduro (u)', 100.00, 0.30),
+('Papas para Llapingacho (kg)', 40.00, 0.00),
+('Cola Grande Botella (u)', 120.00, 0.00);
+
+-- Estructuración de Recetas Maestras (Relación de porciones por plato)
+-- Fritada Tradicional usa: 0.25kg de carne, 0.15kg de mote, 0.05kg de tostado y 1 maduro
+INSERT INTO Receta (id_plato, id_ingrediente, cantidad_base) VALUES 
+(1, 1, 0.25), 
+(1, 2, 0.15), 
+(1, 3, 0.05), 
+(1, 4, 1.00);
+
+-- Fritada Especial Doble usa el doble de carne de cerdo
+INSERT INTO Receta (id_plato, id_ingrediente, cantidad_base) VALUES 
+(2, 1, 0.50), 
+(2, 2, 0.15), 
+(2, 3, 0.05), 
+(2, 4, 2.00);
+
+-- Llapingachos usa papas y mote
+INSERT INTO Receta (id_plato, id_ingrediente, cantidad_base) VALUES 
+(3, 5, 0.30), 
+(3, 2, 0.10);
+
+-- La Bebida descuenta directamente una unidad de la botella
+INSERT INTO Receta (id_plato, id_ingrediente, cantidad_base) VALUES 
+(4, 6, 1.00);
+
+-- Registro de Paletas Físicas Iniciales
+INSERT INTO Mesa (numero_mesa, capacidad) VALUES (1, 4), (2, 4), (3, 4), (5, 4), (10, 4), (12, 4);

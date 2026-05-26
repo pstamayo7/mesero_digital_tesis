@@ -1,12 +1,12 @@
-# backend/app/schemas/pedido_schema.py
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class ItemPedido(BaseModel):
-    plato: str = Field(description="Nombre del platillo o bebida (ej. Fritada, Cola)")
+    plato: str = Field(description="Nombre del platillo")
     cantidad: int = Field(description="Cantidad solicitada en números")
-    modificaciones: Optional[str] = Field(default="", description="Notas o excepciones (ej. sin cebolla, sin hielo, extra tostado)")
+    modificaciones: Optional[str] = Field(default="", description="Notas extras")
 
 class OrdenEstructurada(BaseModel):
-    respuesta_mesero: str = Field(description="Frase corta, amigable y natural confirmando la acción realizada.")
+    respuesta_mesero: str = Field(description="Respuesta hablada.")
+    numero_mesa: int = Field(default=0, description="Número de mesa/paleta. 0 si aún no lo dice.") # <-- NUEVO
     pedidos: List[ItemPedido]

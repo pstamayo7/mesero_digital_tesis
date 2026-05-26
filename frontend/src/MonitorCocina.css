@@ -1,0 +1,175 @@
+.monitor-cocina {
+  background-color: #121824;
+  color: #ffffff;
+  min-height: 100vh;
+  padding: 25px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.cocina-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px solid #1f293d;
+  padding-bottom: 15px;
+  margin-bottom: 25px;
+}
+
+.btn-refrescar {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.comandas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 25px;
+}
+
+.comanda-tarjeta {
+  background-color: #1f293d;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  border: 1px solid #2d3748;
+  overflow: hidden;
+}
+
+.comanda-cabecera {
+  background-color: #2d3748;
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  font-size: 1.2rem;
+  border-bottom: 2px solid #1a202c;
+}
+
+.pedido-num { color: #f59e0b; }
+.mesa-num { color: #10b981; }
+
+.comanda-items {
+  padding: 10px;
+}
+
+.item-fila {
+  background-color: #1a202c;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  border-left: 5px solid #6b7280;
+}
+
+.item-fila.estado-preparando {
+  border-left-color: #3b82f6;
+  background-color: #1e293b;
+}
+
+.item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.item-cantidad {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #f59e0b;
+}
+
+.item-nombre {
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.item-notas {
+  color: #ef4444;
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+.item-badge-estado {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  background-color: #4a5568;
+  padding: 2px 6px;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.item-acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Botonera de acciones táctiles */
+.btn-accion {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.btn-accion.aceptar { background-color: #10b981; color: white; }
+.btn-accion.rechazar { background-color: #ef4444; color: white; }
+.btn-accion.listo { background-color: #059669; color: white; width: 100%; }
+.btn-accion.demorar { background-color: #6b7280; color: white; }
+.btn-accion.cancelar-cli { background-color: #4b5563; color: #9ca3af; }
+
+/* Modal de excepciones y justificaciones */
+.modal-sobrecapa {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0,0,0,0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-contenido {
+  background-color: #1f293d;
+  padding: 30px;
+  border-radius: 8px;
+  max-width: 450px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+.modal-select {
+  width: 100%;
+  padding: 12px;
+  margin: 20px 0;
+  background-color: #1a202c;
+  color: white;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.modal-botones {
+  display: flex;
+  gap: 15px;
+}
+
+.btn-modal {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  flex: 1;
+}
+
+.btn-modal.confirmar { background-color: #ef4444; color: white; }
+.btn-modal.cancelar { background-color: #4a5568; color: white; }

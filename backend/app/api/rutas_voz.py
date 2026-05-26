@@ -1,8 +1,7 @@
-# backend/app/api/rutas_voz.py
 from fastapi import APIRouter, UploadFile, File, Form
-from fastapi.responses import FileResponse
 import tempfile
 import os
+import base64
 from app.services.ia_service import procesar_audio_con_ia
 
 router = APIRouter()
@@ -10,7 +9,7 @@ router = APIRouter()
 @router.post("/pedido-voz")
 async def procesar_audio(
     audio: UploadFile = File(...), 
-    carrito_actual: str = Form("[]") # <-- ¡Aquí recibimos la memoria desde React!
+    carrito_actual: str = Form("[]")
 ):
     print(f"\n🎙️ Recibiendo audio y estado actual del carrito...")
     
@@ -23,20 +22,22 @@ async def procesar_audio(
         resultado = procesar_audio_con_ia(ruta_temporal, carrito_actual)
         
         if resultado.get("exito"):
-            # Para enviar el archivo de audio Y los datos JSON juntos, 
-            # guardamos los datos en las cabeceras (headers) de la respuesta.
-            import json
-            headers = {
-                "X-Transcripcion": resultado["transcripcion"].encode('latin-1', 'ignore').decode('latin-1'),
-                "X-Orden-JSON": json.dumps(resultado["orden"])
-            }
+            ruta_audio = resultado["ruta_audio"]
             
-            # Devolvemos el archivo de audio. El navegador de React lo reproducirá automáticamente.
-            return FileResponse(
-                path=resultado["ruta_audio"], 
-                media_type="audio/wav", 
-                headers=headers
-            )
+            # 🌟 SOLUCIÓN AL BUG: Codificamos el audio en Base64 para enviarlo en el cuerpo JSON
+            with open(ruta_audio, "rb") as f_audio:
+                audio_b64 = base64.b64encode(f_audio.read()).decode("utf-8")
+            
+            # Limpiamos el archivo temporal generado por pyttsx3
+            if os.path.exists(ruta_audio):
+                os.remove(ruta_audio)
+
+            # Devolvemos todo estructurado en un solo objeto de respuesta estándar
+            return {
+                "transcripcion": resultado["transcripcion"],
+                "orden": resultado["orden"],
+                "audio_b64": audio_b64
+            }
         else:
             return {"error": resultado["error"]}
             

@@ -9,14 +9,15 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: adminpassword
       POSTGRES_DB: zita_db
+      TZ: America/Guayaquil
     ports:
       - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # 🌟 RUTA FÍSICA: Guarda la BD en la carpeta de tu proyecto
+      - ./postgres_datos:/var/lib/postgresql/data
 
-  # --- NUEVO: EL ORQUESTADOR N8N ---
   n8n:
-    image: n8nio/n8n:latest
+    image: docker.n8n.io/n8nio/n8n:latest
     container_name: zita_n8n
     restart: always
     ports:
@@ -27,12 +28,11 @@ services:
       - N8N_PROTOCOL=http
       - NODE_ENV=production
       - WEBHOOK_URL=http://localhost:5678/
-      - GENERIC_TIMEZONE=America/Guayaquil # Ajustado a tu zona horaria para los timestamps de los pedidos
+      - GENERIC_TIMEZONE=America/Guayaquil 
+      - TZ=America/Guayaquil
     volumes:
-      - n8n_data:/home/node/.n8n
+      # 🌟 RUTA FÍSICA: Guarda los flujos en la carpeta de tu proyecto
+      - ./n8n_config:/home/node/.n8n
     depends_on:
-      - db # Obliga a Docker a encender primero la BDD y luego n8n
+      - db
 
-volumes:
-  pgdata:
-  n8n_data: # Nuevo volumen para guardar los flujos de n8n
