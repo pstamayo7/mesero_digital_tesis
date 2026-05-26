@@ -58,29 +58,38 @@ function MonitorCocina() {
       .then(res => res.json())
       .then(datos => {
         const agrupadas = {}
+        
         datos.ordenes.forEach(item => {
           if (!agrupadas[item.id_pedido]) {
             agrupadas[item.id_pedido] = {
               id_pedido: item.id_pedido,
               id_mesa: item.id_mesa,
               fecha_inicio_global: null,
-              tiempo_max_prep: 0, // 🌟 CORRECCIÓN 1: Volvemos a usar el cuello de botella
+              tiempo_max_asignado: 0, 
+              solo_bebidas: true, // 🌟 Asumimos que es bebida hasta ver un plato fuerte
               items: []
             }
           }
           
-          // Buscamos el plato que más se demora (Ej: 18 mins)
-          if (item.tiempo_prep_min > agrupadas[item.id_pedido].tiempo_max_prep) {
-            agrupadas[item.id_pedido].tiempo_max_prep = item.tiempo_prep_min
+          // Si el backend dice que es comida, cambiamos la etiqueta
+          if (item.requiere_coccion === true) {
+             agrupadas[item.id_pedido].solo_bebidas = false;
+          }
+
+          // 🌟 MAGIA PURA: Leemos el tiempo exacto que la base de datos selló. No sumamos nada.
+          const tiempoDB = parseInt(item.tiempo_asignado_cocina) || 0;
+          if (tiempoDB > agrupadas[item.id_pedido].tiempo_max_asignado) {
+            agrupadas[item.id_pedido].tiempo_max_asignado = tiempoDB;
           }
           
-          if (item.fecha_inicio_preparacion) {
-            agrupadas[item.id_pedido].fecha_inicio_global = item.fecha_inicio_preparacion
+          if (item.fecha_inicio_preparacion && !agrupadas[item.id_pedido].fecha_inicio_global) {
+            agrupadas[item.id_pedido].fecha_inicio_global = item.fecha_inicio_preparacion;
           }
+          
           agrupadas[item.id_pedido].items.push(item)
         })
 
-        setComandas(Object.values(agrupadas))
+        setComandas(Object.values(agrupadas).sort((a,b) => a.id_pedido - b.id_pedido))
         setCargando(false)
       })
       .catch(() => setCargando(false))
@@ -105,13 +114,33 @@ function MonitorCocina() {
     }
   }
 
-  const manejarAccionItem = async (id_detalle, accion) => {
-    if (accion === 'LISTO') {
-      await fetch(`http://127.0.0.1:8000/cocina/entregar/${id_detalle}`, { method: 'POST' })
-    } else {
-      alert(`Acción administrativa [${accion}] registrada para el ítem ${id_detalle}`)
+ const manejarAccionItem = async (id_detalle, accion) => {
+    try {
+      if (accion === 'LISTO') {
+        // Hacemos la petición al backend
+        const respuesta = await fetch(`http://127.0.0.1:8000/cocina/entregar/${id_detalle}`, { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        // Verificamos si el backend arrojó un error (Ej: Error 500)
+        if (!respuesta.ok) {
+          const errorDatos = await respuesta.json();
+          alert(`❌ Error del servidor: ${errorDatos.detail || 'Fallo desconocido'}`);
+          return; // Cortamos la ejecución para no recargar datos falsos
+        }
+      } else {
+        alert(`Acción administrativa [${accion}] registrada para el ítem ${id_detalle}`);
+      }
+      
+      // Forzamos la actualización inmediata de la pantalla
+      cargarComandas();
+
+    } catch (error) {
+      // Capturamos si el backend está apagado o hay un problema de CORS
+      console.error("Error de conexión:", error);
+      alert("❌ No se pudo conectar con el servidor. Revisa si FastAPI está encendido.");
     }
-    cargarComandas()
   }
 
   const pedidosEnPreparacion = comandas.filter(c => c.items.some(i => i.estado_item === 'PREPARANDO')).length;
@@ -146,33 +175,16 @@ function MonitorCocina() {
                     <span className="pedido-num">Pedido #{comanda.id_pedido}</span>
                     <span className="mesa-num"> 🪑 Paleta: {comanda.id_mesa}</span>
                   </div>
-                  {!tieneSolicitados && (
-                    <TemporizadorPedido fechaInicio={comanda.fecha_inicio_global} tiempoPrep={comanda.tiempo_max_prep} />
+              {comanda.fecha_inicio_global && (
+                    comanda.solo_bebidas ? (
+                      <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🥤 Despacho Inmediato</span>
+                    ) : (
+                      <TemporizadorPedido fechaInicio={comanda.fecha_inicio_global} tiempoPrep={comanda.tiempo_max_asignado} />
+                    )
                   )}
                 </div>
 
-                {tieneSolicitados && (
-                  <div style={{ padding: '10px' }}>
-                    <button 
-                      onClick={() => manejarAceptarPedido(comanda.id_pedido)} 
-                      // Bloqueamos si no es su turno OR si la cocina ya tiene 2 pedidos adentro
-                      disabled={!esElTurno || cocinaSaturada}
-                      className="btn-accion aceptar" 
-                      style={{ 
-                        width: '100%', 
-                        padding: '12px',
-                        // Verde si está listo, Naranja si la cocina está llena, Gris si no es su turno
-                        backgroundColor: esElTurno ? (cocinaSaturada ? '#d97706' : '#10b981') : '#4b5563', 
-                        cursor: (!esElTurno || cocinaSaturada) ? 'not-allowed' : 'pointer',
-                        opacity: (!esElTurno || cocinaSaturada) ? '0.5' : '1'
-                      }}
-                    >
-                      {esElTurno 
-                        ? (cocinaSaturada ? "⏳ Cocina Llena (Espera que salga un plato)" : "👨‍🍳 Iniciar Preparación") 
-                        : "⏳ Esperando turno anterior..."}
-                    </button>
-                  </div>
-                )}
+            
                 
                 <div className="comanda-items">
                   {comanda.items.map((item) => (
