@@ -84,3 +84,33 @@ def obtener_config_kiosko():
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+
+@router.get("/mesas-disponibles", tags=["Configuración"])
+def obtener_mesas_disponibles():
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 1. ¿Cuántas paletas de madera compró Doña Zita en total?
+        cursor.execute("SELECT total_paletas FROM Configuracion_Operativa LIMIT 1;")
+        config = cursor.fetchone()
+        total_paletas = config[0] if config else 15
+        
+        # 2. ¿Cuáles están ocupadas ahora mismo en el local?
+        cursor.execute("SELECT DISTINCT id_mesa FROM Pedido WHERE estado_pago = 'PENDIENTE' AND id_mesa > 0;")
+        ocupadas = [row[0] for row in cursor.fetchall()]
+        
+        # 3. Matemática simple: Libres = Totales - Ocupadas
+        disponibles = [m for m in range(1, total_paletas + 1) if m not in ocupadas]
+        
+        return {"disponibles": disponibles}
+    except Exception as e:
+        print(f"❌ Error consultando mesas: {e}")
+        return {"disponibles": []}
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+        

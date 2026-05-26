@@ -106,7 +106,8 @@ def obtener_ordenes_cocina():
                 dp.id_detalle, dp.id_pedido, p.nombre AS plato_nombre, 
                 p.requiere_coccion, dp.tiempo_asignado_cocina,
                 dp.cantidad, dp.estado_item, dp.especificaciones_ia, 
-                dp.fecha_solicitud, dp.fecha_inicio_preparacion, pe.id_mesa
+                dp.fecha_solicitud, dp.fecha_inicio_preparacion, pe.id_mesa,
+                pe.cliente_nombre -- 🌟 AGREGAR ESTA LÍNEA
             FROM Detalle_Pedido dp
             JOIN Plato p ON dp.id_plato = p.id_plato
             JOIN Pedido pe ON dp.id_pedido = pe.id_pedido
@@ -149,13 +150,71 @@ def entregar_plato(id_detalle: int):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        query = "UPDATE Detalle_Pedido SET estado_item = 'ENTREGADO' WHERE id_detalle = %s;"
+        # 🌟 NUEVO: Guardamos la hora exacta en que se marcó como listo
+        query = "UPDATE Detalle_Pedido SET estado_item = 'ENTREGADO', fecha_entrega = CURRENT_TIMESTAMP WHERE id_detalle = %s;"
         cursor.execute(query, (id_detalle,))
         conn.commit()
         return {"mensaje": f"Plato {id_detalle} completado."}
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+@router.get("/cliente/turnos", tags=["Pantalla Clientes"])
+def obtener_turnos_cliente():
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        from psycopg2.extras import RealDictCursor
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        query = """
+            SELECT 
+                pe.id_pedido, 
+                pe.id_mesa,
+                pe.cliente_nombre, -- 🌟 AGREGAR ESTA LÍNEA
+                COUNT(dp.id_detalle) as total_items,
+                SUM(CASE WHEN dp.estado_item = 'PREPARANDO' THEN 1 ELSE 0 END) as items_preparando,
+                SUM(CASE WHEN dp.estado_item = 'ENTREGADO' THEN 1 ELSE 0 END) as items_entregados,
+                MAX(dp.fecha_inicio_preparacion) as fecha_inicio,
+                MAX(dp.tiempo_asignado_cocina) as tiempo_assigned,
+                MAX(dp.fecha_entrega) as ultima_entrega
+            FROM Pedido pe
+            JOIN Detalle_Pedido dp ON pe.id_pedido = dp.id_pedido
+            WHERE dp.estado_item != 'CANCELADO' AND dp.fecha_solicitud >= CURRENT_DATE
+            GROUP BY pe.id_pedido, pe.id_mesa, pe.cliente_nombre -- 🌟 AGREGAR AQUÍ
+            HAVING 
+                COUNT(dp.id_detalle) > SUM(CASE WHEN dp.estado_item = 'ENTREGADO' THEN 1 ELSE 0 END)
+                OR MAX(dp.fecha_entrega) > (CURRENT_TIMESTAMP - INTERVAL '5 minutes');
+        """
+        cursor.execute(query)
+        pedidos_db = cursor.fetchall()
+        
+        turnos = []
+        for p in pedidos_db:
+            if p['total_items'] == p['items_entregados'] and p['total_items'] > 0:
+                estado = 'LISTO'
+            elif p['items_preparando'] > 0:
+                estado = 'PREPARANDO'
+            else:
+                estado = 'EN_COLA'
+                
+            turnos.append({
+                "id_pedido": p['id_pedido'],
+                "id_mesa": p['id_mesa'],
+                "cliente_nombre": p['cliente_nombre'], 
+                "estado": estado,
+                "fecha_inicio": p['fecha_inicio'],
+                "tiempo_asignado": p['tiempo_assigned']
+            })
+            
+        return {"turnos": turnos}
+    except Exception as e:
+        print(f"❌ ERROR SQL EN PANTALLA TURNOS: {e}")
+        raise HTTPException(status_code=500, detail="Error interno")
     finally:
         if cursor: cursor.close()
         if conn: conn.close()

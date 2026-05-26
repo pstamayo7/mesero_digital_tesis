@@ -2,6 +2,7 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import Kiosko from './Kiosko'
 import MonitorCocina from './MonitorCocina'
+import PantallaTurnos from './PantallaTurnos' // 🌟 NUEVO IMPORT
 
 function App() {
   return (
@@ -14,6 +15,10 @@ function App() {
         <Link to="/cocina" style={{ color: '#f8fafc', textDecoration: 'none', fontWeight: 'bold', fontSize: '1rem' }}>
           👨‍🍳 Monitor Cocina
         </Link>
+        {/* 🌟 NUEVO ENLACE PARA LA PANTALLA */}
+        <Link to="/turnos" style={{ color: '#f8fafc', textDecoration: 'none', fontWeight: 'bold', fontSize: '1rem' }}>
+          📺 Pantalla Turnos
+        </Link>
       </nav>
 
       {/* 🚦 Enrutamiento Declarativo de la Aplicación */}
@@ -23,6 +28,9 @@ function App() {
         
         {/* Ruta de producción: Terminal secundaria del cocinero */}
         <Route path="/cocina" element={<MonitorCocina />} />
+
+        {/* 🌟 NUEVA RUTA: Terminal de visualización para los clientes */}
+        <Route path="/turnos" element={<PantallaTurnos />} />
       </Routes>
     </Router>
   )

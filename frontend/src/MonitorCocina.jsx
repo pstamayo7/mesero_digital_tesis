@@ -8,17 +8,17 @@ function TemporizadorPedido({ fechaInicio, tiempoPrep }) {
 
   useEffect(() => {
     if (!fechaInicio) return;
-    
+
     const calcularTiempo = () => {
       // 1. Obtenemos la hora actual de tu computadora
       const ahora = new Date();
-      
+
       // 2. PARCHEO DE ZONA HORARIA: 
       // Reemplazamos cualquier "Z" (UTC) o "T" y forzamos a JS a interpretar la fecha
       // exactamente como viene de la base de datos (hora local), sin conversiones.
       // Así evitamos el salto de 5 horas.
       const fechaLimpia = fechaInicio.replace('T', ' ').replace('Z', '').split('.')[0];
-      const inicio = new Date(fechaLimpia.replace(/-/g, '/')); 
+      const inicio = new Date(fechaLimpia.replace(/-/g, '/'));
 
       const tiempoMaximoMs = tiempoPrep * 60 * 1000;
       const tiempoTranscurridoMs = ahora - inicio;
@@ -35,14 +35,14 @@ function TemporizadorPedido({ fechaInicio, tiempoPrep }) {
         setSegundosRestantes(Math.floor((restanteMs % 60000) / 1000).toString().padStart(2, '0'));
       }
     }
-    
+
     calcularTiempo();
     const intv = setInterval(calcularTiempo, 1000);
     return () => clearInterval(intv);
   }, [fechaInicio, tiempoPrep]);
 
   if (!fechaInicio) return null;
-  
+
   return (
     <span style={{ color: atrasado ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>
       {atrasado ? `🚨 +${minutosRestantes}:${segundosRestantes}` : `⏱️ ${minutosRestantes}:${segundosRestantes}`}
@@ -58,22 +58,23 @@ function MonitorCocina() {
       .then(res => res.json())
       .then(datos => {
         const agrupadas = {}
-        
+
         datos.ordenes.forEach(item => {
           if (!agrupadas[item.id_pedido]) {
             agrupadas[item.id_pedido] = {
               id_pedido: item.id_pedido,
               id_mesa: item.id_mesa,
+              cliente_nombre: item.cliente_nombre, // 🌟 GUARDAMOS EL NOMBRE AQUÍ
               fecha_inicio_global: null,
-              tiempo_max_asignado: 0, 
-              solo_bebidas: true, // 🌟 Asumimos que es bebida hasta ver un plato fuerte
+              tiempo_max_asignado: 0,
+              solo_bebidas: true,
               items: []
             }
           }
-          
+
           // Si el backend dice que es comida, cambiamos la etiqueta
           if (item.requiere_coccion === true) {
-             agrupadas[item.id_pedido].solo_bebidas = false;
+            agrupadas[item.id_pedido].solo_bebidas = false;
           }
 
           // 🌟 MAGIA PURA: Leemos el tiempo exacto que la base de datos selló. No sumamos nada.
@@ -81,15 +82,15 @@ function MonitorCocina() {
           if (tiempoDB > agrupadas[item.id_pedido].tiempo_max_asignado) {
             agrupadas[item.id_pedido].tiempo_max_asignado = tiempoDB;
           }
-          
+
           if (item.fecha_inicio_preparacion && !agrupadas[item.id_pedido].fecha_inicio_global) {
             agrupadas[item.id_pedido].fecha_inicio_global = item.fecha_inicio_preparacion;
           }
-          
+
           agrupadas[item.id_pedido].items.push(item)
         })
 
-        setComandas(Object.values(agrupadas).sort((a,b) => a.id_pedido - b.id_pedido))
+        setComandas(Object.values(agrupadas).sort((a, b) => a.id_pedido - b.id_pedido))
         setCargando(false)
       })
       .catch(() => setCargando(false))
@@ -114,11 +115,11 @@ function MonitorCocina() {
     }
   }
 
- const manejarAccionItem = async (id_detalle, accion) => {
+  const manejarAccionItem = async (id_detalle, accion) => {
     try {
       if (accion === 'LISTO') {
         // Hacemos la petición al backend
-        const respuesta = await fetch(`http://127.0.0.1:8000/cocina/entregar/${id_detalle}`, { 
+        const respuesta = await fetch(`http://127.0.0.1:8000/cocina/entregar/${id_detalle}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -132,7 +133,7 @@ function MonitorCocina() {
       } else {
         alert(`Acción administrativa [${accion}] registrada para el ítem ${id_detalle}`);
       }
-      
+
       // Forzamos la actualización inmediata de la pantalla
       cargarComandas();
 
@@ -146,7 +147,7 @@ function MonitorCocina() {
   const pedidosEnPreparacion = comandas.filter(c => c.items.some(i => i.estado_item === 'PREPARANDO')).length;
   // 2. ¿Podemos aceptar más? Solo si hay menos de 2.
   const cocinaSaturada = pedidosEnPreparacion >= 2;
-  
+
   // 3. Seguimos forzando el orden FIFO para el siguiente turno disponible
   const primerPedidoPendiente = comandas.find(c => c.items.some(i => i.estado_item === 'SOLICITADO'));
   const idSiguienteTurno = primerPedidoPendiente ? primerPedidoPendiente.id_pedido : null;
@@ -167,15 +168,17 @@ function MonitorCocina() {
             const tieneSolicitados = comanda.items.some(i => i.estado_item === 'SOLICITADO')
             // Verificamos si este pedido es el que toca atender obligatoriamente
             const esElTurno = comanda.id_pedido === idSiguienteTurno
-            
+
             return (
               <div key={comanda.id_pedido} className="comanda-tarjeta">
                 <div className="comanda-cabecera">
-                  <div>
-                    <span className="pedido-num">Pedido #{comanda.id_pedido}</span>
-                    <span className="mesa-num"> 🪑 Paleta: {comanda.id_mesa}</span>
+                  <div className="comanda-cabecera">
+                    <span className="pedido-titulo">Pedido #{comanda.id_pedido}</span>
+                    <span className="mesa-titulo">
+                      {comanda.id_mesa === 0 ? `🛍️ Llevar: ${comanda.cliente_nombre}` : `🪑 Paleta: ${comanda.id_mesa}`}
+                    </span>
                   </div>
-              {comanda.fecha_inicio_global && (
+                  {comanda.fecha_inicio_global && (
                     comanda.solo_bebidas ? (
                       <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🥤 Despacho Inmediato</span>
                     ) : (
@@ -184,8 +187,8 @@ function MonitorCocina() {
                   )}
                 </div>
 
-            
-                
+
+
                 <div className="comanda-items">
                   {comanda.items.map((item) => (
                     <div key={item.id_detalle} className={`item-fila estado-${item.estado_item.toLowerCase()}`}>
@@ -196,15 +199,15 @@ function MonitorCocina() {
 
                       <div className="item-acciones">
                         {item.estado_item === 'SOLICITADO' && (
-                          <button 
-                            onClick={() => manejarRechazo(item.id_detalle)} 
+                          <button
+                            onClick={() => manejarRechazo(item.id_detalle)}
                             className="btn-accion rechazar"
-                            disabled={!esElTurno} 
-                            style={{ 
+                            disabled={!esElTurno}
+                            style={{
                               opacity: esElTurno ? '1' : '0.5',
-                              padding: '4px 8px', 
-                              fontSize: '0.75rem', 
-                              maxWidth: '90px', 
+                              padding: '4px 8px',
+                              fontSize: '0.75rem',
+                              maxWidth: '90px',
                               backgroundColor: '#991b1b',
                               marginLeft: 'auto' // Lo empuja a la derecha
                             }}
@@ -212,13 +215,13 @@ function MonitorCocina() {
                             ⚠️ Problema
                           </button>
                         )}
-                        
+
                         {item.estado_item === 'PREPARANDO' && (
                           <>
                             <button onClick={() => manejarAccionItem(item.id_detalle, 'LISTO')} className="btn-accion listo">
                               ✓ ¡Listo!
                             </button>
-                            <button onClick={() => manejarAccionItem(item.id_detalle, 'DEMORADO')} className="btn-accion demorar" style={{flex: '0.5'}}>
+                            <button onClick={() => manejarAccionItem(item.id_detalle, 'DEMORADO')} className="btn-accion demorar" style={{ flex: '0.5' }}>
                               Retraso
                             </button>
                           </>

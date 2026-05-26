@@ -1,0 +1,159 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "orden-zita",
+        "options": {}
+      },
+      "id": "f1135c5d-ea3b-4d5c-8bdc-9fa7d996426e",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -144,
+        16
+      ],
+      "webhookId": "orden-zita"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO Pedido (id_mesa, estado_pago, subtotal, total_final)\nVALUES ({{ $json.body.id_mesa }}, 'PENDIENTE', 0.00, 0.00)\nRETURNING id_pedido;",
+        "options": {}
+      },
+      "id": "b70ae773-3136-4f89-b186-48c0bd513abc",
+      "name": "Insertar Cabecera Pedido",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [
+        80,
+        16
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "2wlbEAyo09EHN0Fd",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1f2g3h4",
+              "name": "platos",
+              "value": "={{ $('Webhook').first().json.body.pedidos }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "68405ab2-f60e-41a4-9d37-35d47de4936e",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        304,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "platos",
+        "options": {}
+      },
+      "id": "a684a599-9806-4670-8e45-8b2176608639",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        528,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO Detalle_Pedido (id_pedido, id_plato, cantidad, especificaciones_ia, estado_item) \nVALUES (\n    {{ $('Insertar Cabecera Pedido').first().json.id_pedido }}, \n    (SELECT id_plato FROM Plato WHERE LOWER(nombre) = LOWER('{{ $json.plato }}') LIMIT 1), \n    {{ $json.cantidad }}, \n    '{{ $json.modificaciones }}',\n    'SOLICITADO'\n);",
+        "options": {}
+      },
+      "id": "c7187cf2-b5e1-40c1-8161-a553052a3098",
+      "name": "Insertar Detalle Final",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.3,
+      "position": [
+        736,
+        16
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "2wlbEAyo09EHN0Fd",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Insertar Cabecera Pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar Cabecera Pedido": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Insertar Detalle Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "09e770df-ee6b-4ead-b7f6-3e25f8d36df6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e6a3a08ad7dd4ec5c75e880b663cd6b6a1c0afebf120f6b8b363394c37789224"
+  },
+  "id": "oUPx0e5fOPGgvylT",
+  "tags": []
+}
