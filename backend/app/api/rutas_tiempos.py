@@ -3,6 +3,7 @@ from fastapi import APIRouter, Body
 from psycopg2.extras import RealDictCursor
 from app.core.database import get_db_connection
 
+
 router = APIRouter()
 
 @router.post("/estimar-tiempo", tags=["Gestión Operativa"])
@@ -64,6 +65,22 @@ def estimar_tiempo(carrito: list = Body(...)):
 
     except Exception as e:
         return {"tiempo_estimado_minutos": 15}
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+@router.get("/configuracion-kiosko", tags=["Configuración"])
+def obtener_config_kiosko():
+    """Devuelve los parámetros operativos para limitar el Kiosko"""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT max_platos_kiosko FROM Configuracion_Operativa LIMIT 1;")
+        config = cursor.fetchone()
+        return {"max_platos": config['max_platos_kiosko'] if config else 15}
+    except Exception as e:
+        return {"max_platos": 15} # Valor seguro por defecto
     finally:
         if cursor: cursor.close()
         if conn: conn.close()

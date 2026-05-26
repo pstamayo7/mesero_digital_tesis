@@ -15,6 +15,19 @@ function Kiosko() {
   const [carrito, setCarrito] = useState([])
   const [tiempoEstimado, setTiempoEstimado] = useState(null)
   const [numeroMesa, setNumeroMesa] = useState(0) // <-- NUEVO ESTADO
+  const [limitePlatos, setLimitePlatos] = useState(15);
+
+  // Al cargar el Kiosko, consultamos el límite a la base de datos
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/configuracion-kiosko')
+      .then(res => res.json())
+      .then(data => setLimitePlatos(data.max_platos))
+      .catch(err => console.error("Usando límite por defecto", err));
+  }, []);
+
+  // Calculamos en tiempo real cuántos platos lleva el cliente
+  const totalPlatosPedido = carrito.reduce((acumulador, item) => acumulador + (parseInt(item.cantidad) || 1), 0);
+  const excedeLimite = totalPlatosPedido > limitePlatos;
 
   // Cargar el menú al inicio
   useEffect(() => {
@@ -212,10 +225,32 @@ function Kiosko() {
             </div>
           )}
           </ul>
+        {/* Alerta de límite comercial */}
+          {excedeLimite && (
+            <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #f87171' }}>
+              <strong>⚠️ ¡Qué gran apetito!</strong> <br/>
+              Tu pedido contiene {totalPlatosPedido} ítems. Para garantizar la frescura y rapidez, el kiosko automático procesa un máximo de <strong>{limitePlatos} ítems</strong>. <br/>
+              Para pedidos masivos o corporativos, por favor acércate a la caja principal.
+            </div>
+          )}
+
+          {/* Botón de Confirmación (Se bloquea si excede el límite) */}
           <button 
-            onClick={confirmarOrden}
-            style={{ background: '#28a745', color: 'white', padding: '15px 30px', fontSize: '1.2rem', border: 'none', borderRadius: '8px', cursor: 'pointer', width: '100%' }}>
-            Confirmar Orden
+            onClick={confirmarOrden} /* <--- ¡CAMBIA ESTO AQUÍ! */
+            disabled={excedeLimite}
+            style={{
+              width: '100%',
+              padding: '15px',
+              backgroundColor: excedeLimite ? '#9ca3af' : '#10b981',
+              color: 'white',
+              fontSize: '1.2rem',
+              fontWeight: 'bold',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: excedeLimite ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {excedeLimite ? 'Límite Excedido' : 'Confirmar Orden'}
           </button>
         </div>
       )}

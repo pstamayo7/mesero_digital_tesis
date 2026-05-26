@@ -32,6 +32,19 @@ def generar_voz_offline(texto: str, ruta_salida: str):
     engine.save_to_file(texto, ruta_salida)
     engine.runAndWait()
 
+def obtener_limite_platos():
+    try:
+        conexion = get_db_connection()
+        cursor = conexion.cursor()
+        cursor.execute("SELECT max_platos_kiosko FROM Configuracion_Operativa LIMIT 1;")
+        resultado = cursor.fetchone()
+        cursor.close()
+        conexion.close()
+        return resultado[0] if resultado else 15
+    except Exception as e:
+        print(f"⚠️ Error BD al obtener límite: {e}")
+        return 15
+
 def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
     # FASE A: ESCUCHAR
     print("🧠 1/3 Transcribiendo audio...")
@@ -44,7 +57,10 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
     menu_real = obtener_menu_disponible()
     menu_formateado = "\n".join([f'- "{plato}"' for plato in menu_real])
     
-    # PROMPT ACTUALIZADO CON MEMORIA Y DIÁLOGO
+    # 🌟 OBTENEMOS EL LÍMITE DINÁMICO DE LA BDD
+    limite_maximo = obtener_limite_platos()
+    
+    # PROMPT ACTUALIZADO CON LÍMITE DINÁMICO
     prompt_sistema = f"""
     Eres el mesero digital amable del restaurante 'Fritadas Doña Zita'.
     Tu objetivo es actualizar el carrito de compras basándote en lo que dice el cliente y responder amigablemente.
@@ -61,6 +77,7 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
     3. Redacta una 'respuesta_mesero' corta, cálida y directa confirmando la acción.
     4. Si el 'numero_mesa' en el carrito actual es 0, incluye en tu 'respuesta_mesero' una frase pidiendo amablemente al cliente que tome un número de la canasta y te lo dicte.
     5. Si el cliente menciona el número que tomó, guárdalo numéricamente en 'numero_mesa'.
+    6. REGLA DE LÍMITE COMERCIAL: El restaurante permite un máximo de {limite_maximo} ítems en total por pedido. Si la suma de los platos solicitados supera los {limite_maximo}, NO los agregues al carrito. Responde amablemente explicando: "¡Me encanta ese apetito! Pero por políticas de calidad, en este kiosko solo puedo procesar hasta {limite_maximo} ítems por orden. Para pedidos grandes, por favor acércate a nuestra caja principal."
     
     Tu respuesta debe ser EXCLUSIVAMENTE este JSON válido:
     {{
