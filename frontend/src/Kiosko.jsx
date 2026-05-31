@@ -2,14 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
 function Kiosko() {
-  const [pasoActual, setPasoActual] = useState(0); 
+  const [pasoActual, setPasoActual] = useState(0);
   const [mesasLibres, setMesasLibres] = useState([]);
   const [esParaLlevar, setEsParaLlevar] = useState(false);
-  
-  // 🌟 NUEVOS ESTADOS PARA EL NOMBRE Y TECLADO
+
+  // 🌟 ESTADOS PARA EL NOMBRE Y TECLADO
   const [nombreCliente, setNombreCliente] = useState("");
   const [mostrarTeclado, setMostrarTeclado] = useState(false);
-  const [escuchandoNombre, setEscuchandoNombre] = useState(false);
+  const [grabandoNombre, setGrabandoNombre] = useState(false);
+  const [mensajeAnfitriona, setMensajeAnfitriona] = useState(""); // Para mostrar lo que dice la IA
 
   const [menu, setMenu] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -19,7 +20,7 @@ function Kiosko() {
   const [transcripcion, setTranscripcion] = useState("")
   const [carrito, setCarrito] = useState([])
   const [tiempoEstimado, setTiempoEstimado] = useState(null)
-  const [numeroMesa, setNumeroMesa] = useState(0) 
+  const [numeroMesa, setNumeroMesa] = useState(0)
   const [limitePlatos, setLimitePlatos] = useState(15);
 
   useEffect(() => {
@@ -45,7 +46,7 @@ function Kiosko() {
     fetch('http://127.0.0.1:8000/menu')
       .then(respuesta => respuesta.json())
       .then(datos => {
-        setMenu(datos.categorias || []) 
+        setMenu(datos.categorias || [])
         setCargando(false)
       })
       .catch(error => {
@@ -61,24 +62,24 @@ function Kiosko() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(carrito)
       })
-      .then(res => res.json())
-      .then(data => {
-        setTiempoEstimado(data.tiempo_estimado_minutos);
-      })
-      .catch(err => console.error("Error estimando tiempo:", err));
+        .then(res => res.json())
+        .then(data => {
+          setTiempoEstimado(data.tiempo_estimado_minutos);
+        })
+        .catch(err => console.error("Error estimando tiempo:", err));
     } else {
       setTiempoEstimado(null);
     }
   }, [carrito]);
+
   // =====================================================================
-  // 🌟 NUEVAS FUNCIONES: CARRITO TÁCTIL (Sincronizado con IA)
+  // CARRITO TÁCTIL (Mantenido)
   // =====================================================================
- const agregarAlCarrito = (platoNombre) => {
+  const agregarAlCarrito = (platoNombre) => {
     setCarrito(prev => {
       const index = prev.findIndex(item => item.plato === platoNombre && !item.modificaciones);
       if (index !== -1) {
         const nuevoCarrito = [...prev];
-        // 🌟 CORRECCIÓN: Clonamos el objeto interno para evitar la doble mutación
         nuevoCarrito[index] = {
           ...nuevoCarrito[index],
           cantidad: parseInt(nuevoCarrito[index].cantidad) + 1
@@ -93,11 +94,10 @@ function Kiosko() {
     setCarrito(prev => {
       const nuevoCarrito = [...prev];
       const nuevaCantidad = parseInt(nuevoCarrito[index].cantidad) + delta;
-      
+
       if (nuevaCantidad <= 0) {
         nuevoCarrito.splice(index, 1);
       } else {
-        // 🌟 CORRECCIÓN: Clonamos el objeto interno aquí también
         nuevoCarrito[index] = {
           ...nuevoCarrito[index],
           cantidad: nuevaCantidad
@@ -112,11 +112,10 @@ function Kiosko() {
   };
 
   const editarNota = (index) => {
-    // Usamos el prompt nativo del navegador por simplicidad táctil
     const notaActual = carrito[index].modificaciones || "";
     const nuevaNota = window.prompt(`Ingresa las modificaciones para ${carrito[index].plato}:`, notaActual);
-    
-    if (nuevaNota !== null) { // Si no le dio a "Cancelar"
+
+    if (nuevaNota !== null) {
       setCarrito(prev => {
         const nuevoCarrito = [...prev];
         nuevoCarrito[index].modificaciones = nuevaNota;
@@ -126,53 +125,81 @@ function Kiosko() {
   };
 
   // =====================================================================
-  // 🌟 NUEVAS FUNCIONES: DICTADO Y TECLADO VIRTUAL
+  // 🌟 NUEVAS FUNCIONES: IA CONVERSACIONAL PARA LA BIENVENIDA
   // =====================================================================
-  const iniciarDictadoNombre = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-      alert("⚠️ Tu navegador no soporta el dictado nativo. Por favor usa el teclado.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'es-ES'; // Aseguramos el idioma
-    recognition.interimResults = false; // Solo queremos el resultado final
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      console.log("🎙️ Escuchando nombre...");
-      setEscuchandoNombre(true);
-    };
-
-    recognition.onresult = (event) => {
-      let texto = event.results[0][0].transcript;
-      console.log("✅ Nombre detectado:", texto);
-      
-      // Limpiamos puntos finales o espacios extra que ponga el navegador
-      texto = texto.replace(/\.$/, '').trim(); 
-      setNombreCliente(texto.toUpperCase());
-    };
-
-    recognition.onerror = (e) => {
-      console.error("❌ Error en dictado:", e.error);
-      if (e.error === 'not-allowed') {
-        alert("⚠️ El navegador bloqueó el micrófono. Revisa los permisos en la barra de direcciones.");
-      } else if (e.error === 'no-speech') {
-        alert("🤫 No escuché nada. Intenta hablar un poco más fuerte.");
-      }
-      setEscuchandoNombre(false);
-    };
-
-    recognition.onend = () => {
-      setEscuchandoNombre(false);
-    };
-    
+  const iniciarGrabacionBienvenida = async () => {
     try {
-      recognition.start();
-    } catch (e) {
-      console.error("El reconocimiento ya estaba corriendo", e);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        if (audioChunksRef.current.length === 0) {
+          setGrabandoNombre(false); return;
+        }
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append("audio", audioBlob, "bienvenida.webm");
+        formData.append("estado_actual_nombre", nombreCliente); // Le pasamos la memoria
+
+        try {
+          const respuesta = await fetch("http://127.0.0.1:8000/bienvenida-voz", {
+            method: "POST",
+            body: formData
+          });
+
+          if (respuesta.ok) {
+            const resultado = await respuesta.json();
+
+            // 1. Mostramos el mensaje en pantalla
+            if (resultado.estado_conversacion) {
+              setMensajeAnfitriona(resultado.estado_conversacion.respuesta_mesero);
+
+              // CÓDIGO CORREGIDO EN FRONTEND
+              if (resultado.estado_conversacion.nombre_cliente !== undefined && resultado.estado_conversacion.nombre_cliente !== null) {
+                setNombreCliente(resultado.estado_conversacion.nombre_cliente.toUpperCase());
+              }
+            }
+
+            // 2. Reproducimos el audio de la IA
+            if (resultado.audio_b64) {
+              const audioIA = new Audio(`data:audio/wav;base64,${resultado.audio_b64}`);
+              audioIA.play();
+            }
+
+            // 3. Verificamos si la IA confirmó el nombre
+            if (resultado.estado_conversacion?.nombre_confirmado) {
+              // Esperamos 3.5 segundos para que la IA termine de despedirse y pasamos al menú
+              setTimeout(() => {
+                setNumeroMesa(0);
+                setEsParaLlevar(true);
+                setPasoActual(1);
+                setMensajeAnfitriona(""); // Limpiamos para la próxima
+              }, 3500);
+            }
+          }
+        } catch (error) {
+          console.error("Error transcribiendo nombre:", error);
+        }
+      };
+
+      mediaRecorderRef.current.start();
+      setGrabandoNombre(true);
+    } catch (error) {
+      alert("Permite el acceso al micrófono.");
+    }
+  };
+
+  const detenerGrabacionBienvenida = () => {
+    if (mediaRecorderRef.current && grabandoNombre) {
+      mediaRecorderRef.current.stop();
+      setGrabandoNombre(false);
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
     }
   };
 
@@ -187,9 +214,9 @@ function Kiosko() {
   };
 
   const tecladoFilas = [
-    ['Q','W','E','R','T','Y','U','I','O','P'],
-    ['A','S','D','F','G','H','J','K','L'],
-    ['Z','X','C','V','B','N','M']
+    ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+    ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+    ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
   ];
 
   // =====================================================================
@@ -220,7 +247,7 @@ function Kiosko() {
             const resultado = await respuesta.json();
             if (resultado.transcripcion) setTranscripcion(resultado.transcripcion);
             if (resultado.orden) {
-              if (resultado.orden.pedidos) setCarrito(resultado.orden.pedidos); 
+              if (resultado.orden.pedidos) setCarrito(resultado.orden.pedidos);
               if (resultado.orden.numero_mesa !== undefined && resultado.orden.numero_mesa !== 0) {
                 setNumeroMesa(resultado.orden.numero_mesa);
               }
@@ -249,7 +276,7 @@ function Kiosko() {
   const confirmarOrden = async () => {
     try {
       const payloadOrden = {
-        id_mesa: esParaLlevar ? 0 : numeroMesa, 
+        id_mesa: esParaLlevar ? 0 : numeroMesa,
         cliente_nombre: esParaLlevar ? nombreCliente : "Local",
         pedidos: carrito
       }
@@ -259,7 +286,7 @@ function Kiosko() {
 
       if (respuesta.ok) {
         alert("¡Orden confirmada! Se está preparando en cocina.");
-        setCarrito([]); setTranscripcion(""); setNumeroMesa(0); setNombreCliente(""); setEsParaLlevar(false); setPasoActual(0); setMostrarTeclado(false);
+        setCarrito([]); setTranscripcion(""); setNumeroMesa(0); setNombreCliente(""); setEsParaLlevar(false); setPasoActual(0); setMostrarTeclado(false); setMensajeAnfitriona("");
       } else {
         alert("Hubo un problema al enviar la orden a cocina.");
       }
@@ -276,11 +303,11 @@ function Kiosko() {
       <div className="kiosko" style={{ textAlign: 'center', padding: '40px 20px', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <h1 style={{ fontSize: '3rem', marginBottom: '10px' }}>🥟 ¡Bienvenido a Doña Zita!</h1>
         <h2 style={{ color: '#4b5563', marginBottom: '40px' }}>Por favor, selecciona tu número de paleta para comenzar:</h2>
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '15px', maxWidth: '800px', margin: '0 auto 40px auto' }}>
           {mesasLibres.length > 0 ? (
             mesasLibres.map(mesa => (
-              <button 
+              <button
                 key={mesa}
                 onClick={() => { setNumeroMesa(mesa); setEsParaLlevar(false); setPasoActual(1); }}
                 style={{ padding: '20px', fontSize: '1.5rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}
@@ -289,35 +316,46 @@ function Kiosko() {
               </button>
             ))
           ) : (
-             <p style={{ gridColumn: '1 / -1', color: '#ef4444', fontWeight: 'bold' }}>Cargando paletas disponibles...</p>
+            <p style={{ gridColumn: '1 / -1', color: '#ef4444', fontWeight: 'bold' }}>Cargando paletas disponibles...</p>
           )}
         </div>
 
-        <hr style={{ maxWidth: '800px', width: '100%', margin: '0 auto 40px auto', borderColor: '#d1d5db' }}/>
+        <hr style={{ maxWidth: '800px', width: '100%', margin: '0 auto 40px auto', borderColor: '#d1d5db' }} />
 
         <div style={{ backgroundColor: '#f3f4f6', padding: '30px', borderRadius: '12px', maxWidth: '700px', margin: '0 auto', width: '100%' }}>
-          <h3 style={{ margin: '0 0 20px 0', fontSize: '1.8rem', color: '#1f2937' }}>🛍️ ¿Es para llevar?</h3>
-          
+          <h3 style={{ margin: '0 0 20px 0', fontSize: '1.8rem', color: '#1f2937' }}>🛍️ ¿Pedido para llevar? Habla con nuestra Anfitriona</h3>
+
+          {/* CUADRO DE DIÁLOGO DE LA IA */}
+          {mensajeAnfitriona && (
+            <div style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '15px', borderRadius: '8px', marginBottom: '20px', fontStyle: 'italic', fontWeight: 'bold' }}>
+              🤖 IA: "{mensajeAnfitriona}"
+            </div>
+          )}
+
           {/* BOTONES DE DICTADO Y TECLADO */}
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
-            <button 
-              onClick={iniciarDictadoNombre}
-              style={{ flex: 1, padding: '15px', fontSize: '1.2rem', backgroundColor: escuchandoNombre ? '#ef4444' : '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+            <button
+              onMouseDown={iniciarGrabacionBienvenida}
+              onMouseUp={detenerGrabacionBienvenida}
+              onTouchStart={iniciarGrabacionBienvenida}
+              onTouchEnd={detenerGrabacionBienvenida}
+              style={{ flex: 1, padding: '15px', fontSize: '1.2rem', backgroundColor: grabandoNombre ? '#ef4444' : '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
             >
-              {escuchandoNombre ? "👂 Escuchando..." : "🎙️ Dictar mi Nombre"}
+              {grabandoNombre ? "👂 Te escucho (Suelta para enviar)..." : "🎙️ Mantén presionado para hablar"}
             </button>
-            <button 
+
+            <button
               onClick={() => setMostrarTeclado(!mostrarTeclado)}
               style={{ flex: 1, padding: '15px', fontSize: '1.2rem', backgroundColor: '#4b5563', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
             >
-              ⌨️ {mostrarTeclado ? "Ocultar Teclado" : "Escribir Nombre"}
+              ⌨️ {mostrarTeclado ? "Ocultar Teclado" : "Escribir Manualmente"}
             </button>
           </div>
 
-          <input 
-            type="text" 
+          <input
+            type="text"
             readOnly
-            placeholder="TU NOMBRE APARECERÁ AQUÍ" 
+            placeholder="TU NOMBRE APARECERÁ AQUÍ"
             value={nombreCliente}
             style={{ width: '90%', padding: '15px', fontSize: '1.5rem', borderRadius: '8px', border: '2px solid #3b82f6', marginBottom: '20px', textAlign: 'center', fontWeight: 'bold', backgroundColor: 'white' }}
           />
@@ -341,9 +379,9 @@ function Kiosko() {
             </div>
           )}
 
-          <button 
+          <button
             disabled={!nombreCliente.trim()}
-            onClick={() => { setNumeroMesa(0); setEsParaLlevar(true); setPasoActual(1); }}
+            onClick={() => { setNumeroMesa(0); setEsParaLlevar(true); setPasoActual(1); setMensajeAnfitriona(""); }}
             style={{ width: '100%', padding: '20px', fontSize: '1.5rem', backgroundColor: nombreCliente.trim() ? '#10b981' : '#9ca3af', color: 'white', border: 'none', borderRadius: '8px', cursor: nombreCliente.trim() ? 'pointer' : 'not-allowed', fontWeight: 'bold' }}
           >
             Siguiente Paso ➡️
@@ -363,13 +401,13 @@ function Kiosko() {
         <div style={{ fontSize: '1.5rem', fontWeight: 'bold', backgroundColor: '#3b82f6', padding: '5px 15px', borderRadius: '8px' }}>
           {esParaLlevar ? `🛍️ Llevar: ${nombreCliente}` : `🪑 Paleta: ${numeroMesa}`}
         </div>
-        <button onClick={() => { setPasoActual(0); setMostrarTeclado(false); }} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer' }}>
+        <button onClick={() => { setPasoActual(0); setMostrarTeclado(false); setMensajeAnfitriona(""); }} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer' }}>
           Cancelar
         </button>
       </div>
 
       <div className="zona-microfono">
-        <button 
+        <button
           className={`btn-microfono ${grabando ? 'grabando' : ''}`}
           onMouseDown={iniciarGrabacion}
           onMouseUp={detenerGrabacion}
@@ -392,10 +430,10 @@ function Kiosko() {
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {carrito.map((item, index) => (
               <li key={index} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #ccc', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <strong style={{ flex: 2, fontSize: '1.2rem' }}>{item.plato}</strong>
-                  
+
                   {/* Controles táctiles de cantidad */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1, justifyContent: 'center' }}>
                     <button onClick={() => cambiarCantidad(index, -1)} style={{ width: '40px', height: '40px', fontSize: '1.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>-</button>
@@ -418,26 +456,26 @@ function Kiosko() {
                 )}
               </li>
             ))}
-           {tiempoEstimado > 0 && (
-            <div style={{ background: '#e9ecef', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #ced4da' }}>
-              <span style={{ fontSize: '1.2rem', color: '#495057', display: 'block', marginBottom: '5px' }}>
-                Tu pedido entrará en cola de producción
-              </span>
-              <span style={{ fontSize: '1.4rem', color: '#d97706', fontWeight: 'bold' }}>
-                ⏱️ Tiempo estimado: {tiempoEstimado} - {tiempoEstimado + 5} minutos
-              </span>
-            </div>
-          )}
+            {tiempoEstimado > 0 && (
+              <div style={{ background: '#e9ecef', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #ced4da' }}>
+                <span style={{ fontSize: '1.2rem', color: '#495057', display: 'block', marginBottom: '5px' }}>
+                  Tu pedido entrará en cola de producción
+                </span>
+                <span style={{ fontSize: '1.4rem', color: '#d97706', fontWeight: 'bold' }}>
+                  ⏱️ Tiempo estimado: {tiempoEstimado} - {tiempoEstimado + 5} minutos
+                </span>
+              </div>
+            )}
           </ul>
           {excedeLimite && (
             <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #f87171' }}>
-              <strong>⚠️ ¡Qué gran apetito!</strong> <br/>
-              Tu pedido contiene {totalPlatosPedido} ítems. Para garantizar la frescura y rapidez, el kiosko automático procesa un máximo de <strong>{limitePlatos} ítems</strong>. <br/>
+              <strong>⚠️ ¡Qué gran apetito!</strong> <br />
+              Tu pedido contiene {totalPlatosPedido} ítems. Para garantizar la frescura y rapidez, el kiosko automático procesa un máximo de <strong>{limitePlatos} ítems</strong>. <br />
               Para pedidos masivos o corporativos, por favor acércate a la caja principal.
             </div>
           )}
 
-          <button 
+          <button
             onClick={confirmarOrden}
             disabled={excedeLimite}
             style={{ width: '100%', padding: '15px', backgroundColor: excedeLimite ? '#9ca3af' : '#10b981', color: 'white', fontSize: '1.2rem', fontWeight: 'bold', border: 'none', borderRadius: '8px', cursor: excedeLimite ? 'not-allowed' : 'pointer' }}
@@ -446,7 +484,7 @@ function Kiosko() {
           </button>
         </div>
       )}
-      
+
       {cargando ? (
         <p className="mensaje-carga">Encendiendo los fogones (Cargando menú)...</p>
       ) : (
@@ -461,9 +499,9 @@ function Kiosko() {
                     <p>{plato.descripcion}</p>
                     <div className="plato-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
                       <span className="precio" style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>${plato.precio.toFixed(2)}</span>
-                      <button 
+                      <button
                         onClick={() => agregarAlCarrito(plato.nombre)}
-                        className="btn-agregar" 
+                        className="btn-agregar"
                         style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
                       >
                         Agregar

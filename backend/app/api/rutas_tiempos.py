@@ -42,7 +42,6 @@ def estimar_tiempo(carrito: list = Body(...)):
         platos_en_cola = cursor.fetchone()['carga_actual']
         
         total_platos = platos_en_cola + platos_nuevo_pedido
-        tandas = math.ceil(total_platos / capacidad_paila)
         
         query_max_time = """
             SELECT COALESCE(MAX(tiempo_prep_min), 15) as max_time
@@ -51,15 +50,26 @@ def estimar_tiempo(carrito: list = Body(...)):
         cursor.execute(query_max_time, (nombres_platos if nombres_platos else [''],))
         tiempo_base = float(cursor.fetchone()['max_time'])
         
-        # Corrección: El factor extra se calcula en base al tamaño de la tanda física (máximo la paila)
-        platos_tanda_base = min(total_platos, capacidad_paila)
-        if platos_tanda_base > 0:
-            tiempo_por_tanda = tiempo_base + (tiempo_base * porc_extra * (platos_tanda_base - 1))
-        else:
-            tiempo_por_tanda = tiempo_base
+        # 🌟 NUEVA MATEMÁTICA FLUIDA 🌟
         
-        # Aplicamos la fórmula paralela de tu tesis
-        tiempo_espera_base = int((tandas * tiempo_por_tanda) / cocineros)
+        # 1. Calculamos el tiempo de una tanda completamente llena (ej. 8 platos)
+        tiempo_tanda_llena = tiempo_base + (tiempo_base * porc_extra * (capacidad_paila - 1))
+        
+        # 2. Vemos cuántas tandas completas y cuántos platos sobrantes hay
+        tandas_completas = total_platos // capacidad_paila
+        platos_sobrantes = total_platos % capacidad_paila
+        
+        # 3. Calculamos el tiempo exacto de la tanda parcial
+        tiempo_tanda_parcial = 0
+        if platos_sobrantes > 0:
+            tiempo_tanda_parcial = tiempo_base + (tiempo_base * porc_extra * (platos_sobrantes - 1))
+            
+        # 4. Sumamos la carga de trabajo total como si hubiera 1 solo súper-cocinero
+        tiempo_total_1_cocinero = (tandas_completas * tiempo_tanda_llena) + tiempo_tanda_parcial
+        
+        # 5. Dividimos entre los cocineros reales. 
+        # Esto genera una línea de crecimiento constante (9 platos = 20 min, 10 platos = 21 min, etc.)
+        tiempo_espera_base = int(tiempo_total_1_cocinero / cocineros)
 
         return {"tiempo_estimado_minutos": tiempo_espera_base}
 
@@ -113,4 +123,3 @@ def obtener_mesas_disponibles():
         if cursor: cursor.close()
         if conn: conn.close()
 
-        

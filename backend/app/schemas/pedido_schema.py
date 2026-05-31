@@ -14,3 +14,7 @@ class OrdenEntrante(BaseModel):
     id_mesa: int
     cliente_nombre: Optional[str] = "Local" # 🌟 NUEVO: Agregamos esto para que lo acepte
     pedidos: list # o List[TuModeloDePlato] dependiendo de cómo lo tengas
+class InteraccionBienvenida(BaseModel):
+    respuesta_mesero: str
+    nombre_cliente: Optional[str] = ""
+    nombre_confirmado: bool = False

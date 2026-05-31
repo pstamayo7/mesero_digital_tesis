@@ -7,7 +7,7 @@ router = APIRouter()
 @router.post("/confirmar-orden")
 def confirmar_orden(orden: dict):
     print("🚀 Recibiendo orden final y enviando a n8n...")
-    webhook_url = "http://localhost:5678/webhook-test/orden-zita"
+    webhook_url = "http://localhost:5678/webhook/orden-zita"
     
     try:
         respuesta = requests.post(webhook_url, json=orden)

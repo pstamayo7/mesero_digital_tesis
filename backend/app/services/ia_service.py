@@ -1,11 +1,11 @@
 # backend/app/services/ia_service.py
-from faster_whisper import WhisperModel
 import ollama
 import json
 import pyttsx3
 import os
-from app.schemas.pedido_schema import OrdenEstructurada
 from app.core.database import get_db_connection
+from faster_whisper import WhisperModel
+from app.schemas.pedido_schema import OrdenEstructurada, InteraccionBienvenida
 
 print("⏳ Cargando modelo acústico (Faster-Whisper)...")
 modelo_whisper = WhisperModel("small", device="cpu", compute_type="int8")
@@ -48,7 +48,18 @@ def obtener_limite_platos():
 def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
     # FASE A: ESCUCHAR
     print("🧠 1/3 Transcribiendo audio...")
-    segmentos, info = modelo_whisper.transcribe(ruta_temporal_audio, beam_size=5, language="es")
+    
+    # 1. Definimos las palabras clave (El diccionario del restaurante)
+    glosario_zita = "Fritada, llapingachos, mote, tostado, maduro, chicharrón, empanadas, yahuarlocro, menú, porción, pedido, colas."
+    
+    # 2. Inyectamos el glosario usando el parámetro initial_prompt
+    segmentos, info = modelo_whisper.transcribe(
+        ruta_temporal_audio, 
+        beam_size=5, 
+        language="es",
+        initial_prompt=glosario_zita
+    )
+    
     texto_completo = " ".join([segmento.text for segmento in segmentos]).strip()
     print(f"🗣️ CLIENTE: '{texto_completo}'")
     
@@ -118,3 +129,93 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
     except Exception as e:
         print("⚠️ Error JSON:", e)
         return {"exito": False, "error": "Fallo lógico en IA"}
+def procesar_audio_bienvenida(ruta_temporal_audio: str, estado_actual_nombre: str):
+    print("🧠 [BIENVENIDA] 1/3 Transcribiendo audio...")
+    
+    glosario_nombres = (
+        "Juan, María, Carlos, Steve, Steven, Kevin, Brayan, Evelyn, Anthony, Christopher, "
+        "Alexander, Mateo, Sofía, hacer un pedido, sí, correcto, exacto, no, me equivoqué."
+    )
+    
+    segmentos, info = modelo_whisper.transcribe(
+        ruta_temporal_audio, 
+        beam_size=5, 
+        language="es",
+        initial_prompt=glosario_nombres
+    )
+    
+    texto_completo = " ".join([segmento.text for segmento in segmentos]).strip()
+    
+    # 🌟 FILTRO ANTI-FANTASMAS DE WHISPER
+    alucinaciones = ["amara.org", "subtítulos", "subtitulos", "traducido"]
+    if any(fantasma in texto_completo.lower() for fantasma in alucinaciones):
+        texto_completo = "" # Si alucina silencio, lo borramos para que actúe como Opción D
+        
+    print(f"🗣️ CLIENTE: '{texto_completo}'")
+    
+    print("🤖 [BIENVENIDA] 2/3 Analizando interacción...")
+    
+    # PROMPT DE PLANTILLAS ESTRICTAS (ANTI-LORO)
+    prompt_sistema = f"""
+    Eres la anfitriona digital del restaurante 'Fritadas Doña Zita'.
+    NUNCA repitas la frase exacta del cliente en tu respuesta. Tu única tarea es devolver un JSON siguiendo estrictamente las opciones de abajo.
+
+    MEMORIA DE LA CONVERSACIÓN:
+    Nombre guardado en sistema: "{estado_actual_nombre}"
+    Lo que acaba de decir el cliente: "{texto_completo}"
+
+    INSTRUCCIONES DE ESTADO (Elige SOLO UNA de las siguientes opciones):
+
+    OPCIÓN A (Confirma el nombre):
+    Si el cliente dice "sí", "correcto", "está bien" (Y NO menciona ningún nombre):
+    - respuesta_mesero: "¡Excelente {estado_actual_nombre}! Te paso con nuestro mesero digital para que tomes tu pedido."
+    - nombre_cliente: "{estado_actual_nombre}"
+    - nombre_confirmado: true
+
+    OPCIÓN B (Rechaza el nombre SIN dar uno nuevo):
+    Si el cliente SOLO dice "no", "está mal", "ese no es" (Y DEFINITIVAMENTE NO te dice su nombre real):
+    - respuesta_mesero: "Uy, discúlpame. ¿Cómo te llamas entonces?"
+    - nombre_cliente: ""
+    - nombre_confirmado: false
+
+    OPCIÓN C (Da su nombre real o LO CORRIGE):
+    Si el cliente menciona un nombre en su frase, AUNQUE empiece con "No" (ej. "Me llamo Steve", "Soy María", "Steve", "No, me llamo Paul", "No, es Carlos"):
+    - respuesta_mesero: "Entendido, te llamas [NOMBRE]. ¿Es correcto?" (Reemplaza [NOMBRE] con el nombre que dedujiste).
+    - nombre_cliente: "[NOMBRE]" (Reemplaza [NOMBRE] con el nombre extraído).
+    - nombre_confirmado: false
+
+    OPCIÓN D (El cliente no dice nada, no se le entiende o solo saluda):
+    Si el texto del cliente está vacío o solo dice "Hola":
+    - respuesta_mesero: "¡Hola! Bienvenido a Doña Zita. Para iniciar tu pedido, ¿me podrías decir tu nombre?"
+    - nombre_cliente: ""
+    - nombre_confirmado: false
+
+    Tu respuesta debe ser EXCLUSIVAMENTE un objeto JSON válido con las claves: respuesta_mesero, nombre_cliente, nombre_confirmado.
+    """
+    
+    respuesta_llm = ollama.chat(
+        model='llama3',
+        messages=[{'role': 'user', 'content': prompt_sistema}],
+        format='json'
+    )
+    
+    json_crudo = respuesta_llm['message']['content']
+    
+    try:
+        print("🗣️ [BIENVENIDA] 3/3 Generando voz...")
+        interaccion = InteraccionBienvenida.model_validate_json(json_crudo)
+        
+        ruta_audio_respuesta = "respuesta_bienvenida_temp.wav"
+        generar_voz_offline(interaccion.respuesta_mesero, ruta_audio_respuesta)
+        
+        print(f"✅ Respuesta IA: {interaccion.respuesta_mesero} | Confirmado: {interaccion.nombre_confirmado}")
+        
+        return {
+            "exito": True, 
+            "transcripcion": texto_completo, 
+            "estado_conversacion": interaccion.model_dump(),
+            "ruta_audio": ruta_audio_respuesta
+        }
+    except Exception as e:
+        print("⚠️ Error JSON en Bienvenida:", e)
+        return {"exito": False, "error": "Fallo lógico en IA de bienvenida"}

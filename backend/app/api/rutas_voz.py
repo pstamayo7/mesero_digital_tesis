@@ -2,11 +2,11 @@ from fastapi import APIRouter, UploadFile, File, Form
 import tempfile
 import os
 import base64
-from app.services.ia_service import procesar_audio_con_ia
+from app.services.ia_service import procesar_audio_con_ia, procesar_audio_bienvenida
 
 router = APIRouter()
 
-@router.post("/pedido-voz")
+@router.post("/pedido-voz", tags=["Interacción Voz"])
 async def procesar_audio(
     audio: UploadFile = File(...), 
     carrito_actual: str = Form("[]")
@@ -24,7 +24,7 @@ async def procesar_audio(
         if resultado.get("exito"):
             ruta_audio = resultado["ruta_audio"]
             
-            # 🌟 SOLUCIÓN AL BUG: Codificamos el audio en Base64 para enviarlo en el cuerpo JSON
+            # Codificamos el audio en Base64 para enviarlo en el cuerpo JSON
             with open(ruta_audio, "rb") as f_audio:
                 audio_b64 = base64.b64encode(f_audio.read()).decode("utf-8")
             
@@ -42,4 +42,49 @@ async def procesar_audio(
             return {"error": resultado["error"]}
             
     finally:
-        os.remove(ruta_temporal)
+        if os.path.exists(ruta_temporal):
+            os.remove(ruta_temporal)
+
+
+@router.post("/bienvenida-voz", tags=["Interacción Voz"])
+async def bienvenida_voz(
+    audio: UploadFile = File(...),
+    estado_actual_nombre: str = Form("")
+):
+    print(f"\n🎙️ Recibiendo audio para bienvenida... (Memoria actual: '{estado_actual_nombre}')")
+    
+    # Usamos la misma lógica segura de archivos temporales
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_audio:
+        contenido = await audio.read()
+        temp_audio.write(contenido)
+        ruta_temporal = temp_audio.name
+        
+    try:
+        # Llamamos a la nueva función de ia_service exclusiva para la bienvenida
+        resultado = procesar_audio_bienvenida(ruta_temporal, estado_actual_nombre)
+        
+        if resultado.get("exito"):
+            ruta_audio = resultado.get("ruta_audio")
+            audio_b64 = None
+            
+            # Codificamos el audio hablado de la anfitriona
+            if ruta_audio and os.path.exists(ruta_audio):
+                with open(ruta_audio, "rb") as f_audio:
+                    audio_b64 = base64.b64encode(f_audio.read()).decode("utf-8")
+                
+                # Limpiamos el .wav generado
+                os.remove(ruta_audio)
+
+            # Devolvemos el estado de la conversación y el audio
+            return {
+                "transcripcion": resultado["transcripcion"],
+                "estado_conversacion": resultado["estado_conversacion"],
+                "audio_b64": audio_b64
+            }
+        else:
+            return {"error": resultado.get("error", "Error desconocido")}
+            
+    finally:
+        # Eliminamos el .webm de entrada
+        if os.path.exists(ruta_temporal):
+            os.remove(ruta_temporal)
