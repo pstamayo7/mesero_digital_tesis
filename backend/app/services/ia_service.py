@@ -54,6 +54,100 @@ def obtener_diccionario_precios():
     except Exception as e:
         print(f"⚠️ Error BD Precios: {e}")
         return {}, {}
+def validar_stock_carrito(carrito_list):
+    """
+    Calcula el consumo total de ingredientes del carrito (Recetas + Extras - SIN) 
+    y verifica si hay suficiente stock en la base de datos.
+    """
+    try:
+        conexion = get_db_connection()
+        cursor = conexion.cursor()
+
+        # 1. Traer stock y tamaño de porciones
+        cursor.execute("SELECT nombre, stock_actual, cantidad_porcion FROM Ingrediente;")
+        ingredientes_db = {}
+        for row in cursor.fetchall():
+            nombre_ing = row[0].strip().lower()
+            ingredientes_db[nombre_ing] = {
+                "stock": float(row[1]),
+                "porcion": float(row[2])
+            }
+
+        # 2. Traer las recetas
+        cursor.execute("""
+            SELECT p.nombre, i.nombre, r.cantidad_base
+            FROM Receta r
+            JOIN Plato p ON r.id_plato = p.id_plato
+            JOIN Ingrediente i ON r.id_ingrediente = i.id_ingrediente;
+        """)
+        recetas_db = {}
+        for row in cursor.fetchall():
+            plato = row[0].strip().lower()
+            ingrediente = row[1].strip().lower()
+            cantidad = float(row[2])
+            if plato not in recetas_db:
+                recetas_db[plato] = {}
+            recetas_db[plato][ingrediente] = cantidad
+
+        cursor.close()
+        conexion.close()
+
+        # 3. Calcular consumo requerido por este carrito
+        consumo_requerido = {}
+
+        def agregar_consumo(nombre_buscado, cantidad_a_sumar):
+            for db_nombre, datos in ingredientes_db.items():
+                if nombre_buscado in db_nombre or db_nombre in nombre_buscado:
+                    consumo_requerido[db_nombre] = consumo_requerido.get(db_nombre, 0.0) + cantidad_a_sumar
+                    return db_nombre
+            return None
+
+        for item in carrito_list:
+            plato_nombre = item["plato"].strip().lower()
+            cantidad_plato = item["cantidad"]
+
+            # A. Consumo del Plato Base (o Porción Suelta)
+            if plato_nombre.startswith("porción de"):
+                ing_solo = plato_nombre.replace("porción de", "").strip()
+                for db_nombre, datos in ingredientes_db.items():
+                    if ing_solo in db_nombre or db_nombre in ing_solo:
+                        agregar_consumo(db_nombre, datos["porcion"] * cantidad_plato)
+                        break
+            else:
+                if plato_nombre in recetas_db:
+                    for ing_receta, cant_base in recetas_db[plato_nombre].items():
+                        agregar_consumo(ing_receta, cant_base * cantidad_plato)
+
+            # B. Consumo de las Modificaciones (EXTRAS suman, SIN restan)
+            for mod in item.get("mods_estructuradas", []):
+                tipo_mod = mod.get("tipo", "").upper()
+                ing_mod = mod.get("ingrediente", "").strip().lower()
+
+                for db_nombre, datos in ingredientes_db.items():
+                    if ing_mod in db_nombre or db_nombre in ing_mod:
+                        if tipo_mod == "EXTRA":
+                            agregar_consumo(db_nombre, datos["porcion"] * cantidad_plato)
+                        elif tipo_mod == "SIN":
+                            agregar_consumo(db_nombre, -datos["porcion"] * cantidad_plato)
+                        break
+
+        # 4. Verificar contra el stock real
+        for ing, cant_req in consumo_requerido.items():
+            if cant_req > 0: # Si quedó negativo por muchos "SIN", no hay problema
+                stock_disponible = ingredientes_db[ing]["stock"]
+                if cant_req > stock_disponible:
+                    nombre_bonito = ing.split("(")[0].strip().title()
+                    return {
+                        "valido": False, 
+                        "ingrediente": nombre_bonito, 
+                        "stock": stock_disponible
+                    }
+
+        return {"valido": True, "consumo": consumo_requerido}
+
+    except Exception as e:
+        print(f"⚠️ Error validando stock: {e}")
+        return {"valido": True} # Si falla la DB, dejamos pasar para no bloquear la venta
 
 def generar_voz_offline(texto: str, ruta_salida: str):
     """Genera un archivo de audio usando el motor local de la computadora (Edge AI)"""
@@ -322,22 +416,46 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
                 "ruta_audio": "limite_excedido.wav" 
             }
 
-        # Estructuramos la salida para React
+        # ... (aquí termina tu validación del límite de los 15 platos) ...
+
+       # 🌟 NUEVO: VALIDACIÓN ESTRICTA DE INVENTARIO 🌟
+        validacion_stock = validar_stock_carrito(carrito_list)
+        
+        texto_a_hablar = ""
+        error_stock_texto = "" 
+        
+        if not validacion_stock["valido"]:
+            ingrediente_agotado = validacion_stock["ingrediente"]
+            stock_restante_kg = validacion_stock["stock"]
+            print(f"🚫 STOCK INSUFICIENTE: Falta {ingrediente_agotado}")
+            
+            # 🌟 REVERSIÓN SEGURA: Volvemos a leer el texto original para matar la referencia en memoria
+            estado_seguro = json.loads(carrito_actual)
+            if isinstance(estado_seguro, list): 
+                carrito_list = estado_seguro
+                total_final = 0.0
+            else:
+                carrito_list = estado_seguro.get("pedidos", [])
+                total_final = estado_seguro.get("total_pedido", 0.0)
+            
+            texto_a_hablar = f"Uy, lo siento muchísimo. Acabo de revisar la bodega y solo nos quedan {stock_restante_kg} porciones de {ingrediente_agotado}. ¿Te gustaría pedir otra cosa o menos cantidad?"
+            
+            # Preparamos el error para React
+            error_stock_texto = f"Stock insuficiente de {ingrediente_agotado}. Quedan {stock_restante_kg} en bodega."
+
+        else:
+            texto_a_hablar = intenciones.respuesta_mesero.strip()
+            if not texto_a_hablar:
+                texto_a_hablar = "¡Claro! He actualizado tu pedido en la pantalla."
+
+        # Estructuramos la salida y metemos el error adentro para que FastAPI no lo borre
         orden_final = OrdenEstructurada(
-            respuesta_mesero=intenciones.respuesta_mesero,
+            respuesta_mesero=texto_a_hablar,
             numero_mesa=numero_mesa_final,
             pedidos=carrito_list,
-            total_pedido=total_final # 🌟 Enviamos el total global al frontend
+            total_pedido=total_final,
+            error_stock=error_stock_texto # 🌟 Aquí viaja el error seguro
         )
-       
-
-       
-        
-        # 🌟 EL BLINDAJE CONTRA TEXTOS VACÍOS 🌟
-        texto_a_hablar = orden_final.respuesta_mesero.strip()
-        if not texto_a_hablar: # Si la IA mandó "" (vacío)
-            texto_a_hablar = "¡Claro! He actualizado tu pedido en la pantalla."
-            orden_final.respuesta_mesero = texto_a_hablar # Lo actualizamos para que el Frontend también lo lea
             
         ruta_audio_respuesta = "respuesta_temp.wav"
         generar_voz_offline(texto_a_hablar, ruta_audio_respuesta)
@@ -348,6 +466,8 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
             "orden": orden_final.model_dump(),
             "ruta_audio": ruta_audio_respuesta
         }
+        
+       
     except Exception as e:
         import traceback
         print("⚠️ Error en procesamiento matemático/JSON:")

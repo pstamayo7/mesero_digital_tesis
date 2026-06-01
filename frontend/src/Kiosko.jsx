@@ -22,6 +22,7 @@ function Kiosko() {
   const [tiempoEstimado, setTiempoEstimado] = useState(null)
   const [numeroMesa, setNumeroMesa] = useState(0)
   const [limitePlatos, setLimitePlatos] = useState(15);
+  const [errorStock, setErrorStock] = useState(""); //
 
   useEffect(() => {
     fetch('http://127.0.0.1:8000/configuracion-kiosko')
@@ -57,18 +58,37 @@ function Kiosko() {
 
   useEffect(() => {
     if (carrito.length > 0) {
+      // 1. Petición original para estimar el tiempo
       fetch('http://127.0.0.1:8000/estimar-tiempo', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(carrito)
       })
         .then(res => res.json())
-        .then(data => {
-          setTiempoEstimado(data.tiempo_estimado_minutos);
-        })
+        .then(data => setTiempoEstimado(data.tiempo_estimado_minutos))
         .catch(err => console.error("Error estimando tiempo:", err));
+
+      // 🌟 2. NUEVA PETICIÓN: Validar stock en tiempo real
+      fetch('http://127.0.0.1:8000/validar-carrito', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(carrito)
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (!data.valido) {
+            // Si el backend dice que no hay, bloqueamos la pantalla
+            setErrorStock(`Stock insuficiente de ${data.ingrediente}. Quedan ${data.stock} en bodega.`);
+          } else {
+            // Si el backend dice que todo está bien (ej. le dio al botón '-'), limpiamos el error
+            setErrorStock(""); 
+          }
+        })
+        .catch(err => console.error("Error validando stock:", err));
+
     } else {
       setTiempoEstimado(null);
+      setErrorStock("");
     }
   }, [carrito]);
 
@@ -76,6 +96,7 @@ function Kiosko() {
   // CARRITO TÁCTIL (AHORA CON COSTEO MATEMÁTICO)
   // =====================================================================
   const agregarAlCarrito = (platoNombre) => {
+   
     setCarrito(prev => {
       const index = prev.findIndex(item => item.plato === platoNombre && !item.modificaciones);
       
@@ -109,6 +130,7 @@ function Kiosko() {
   };
 
   const cambiarCantidad = (index, delta) => {
+    setErrorStock(""); // Limpiamos la alerta si el usuario modifica el carrito a mano
     setCarrito(prev => {
       const nuevoCarrito = [...prev];
       const nuevaCantidad = parseInt(nuevoCarrito[index].cantidad) + delta;
@@ -230,6 +252,7 @@ function Kiosko() {
   // FUNCIONES DEL KIOSKO (Mantenidas)
   // =====================================================================
   const iniciarGrabacion = async () => {
+    setErrorStock(""); // 🌟 Limpiamos el error viejo
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       mediaRecorderRef.current = new MediaRecorder(stream)
@@ -253,7 +276,13 @@ function Kiosko() {
           if (respuesta.ok) {
             const resultado = await respuesta.json();
             if (resultado.transcripcion) setTranscripcion(resultado.transcripcion);
+            
             if (resultado.orden) {
+              // 🌟 NUEVO: Buscamos el error dentro de la orden
+              if (resultado.orden.error_stock) {
+                setErrorStock(resultado.orden.error_stock);
+              }
+
               if (resultado.orden.pedidos) setCarrito(resultado.orden.pedidos);
               if (resultado.orden.numero_mesa !== undefined && resultado.orden.numero_mesa !== 0) {
                 setNumeroMesa(resultado.orden.numero_mesa);
@@ -505,7 +534,14 @@ function Kiosko() {
               ${carrito.reduce((suma, item) => suma + (item.subtotal || 0), 0).toFixed(2)}
             </span>
           </div>
-
+          {/* 🌟 NUEVO: ALERTA ROJA DE STOCK */}
+          {errorStock && (
+            <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #f87171' }}>
+              <strong>🚫 ¡Bodega Insuficiente!</strong> <br />
+              {errorStock} <br />
+              El carrito ha sido revertido a su estado anterior.
+            </div>
+          )}
           {excedeLimite && (
             <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #f87171' }}>
               <strong>⚠️ ¡Qué gran apetito!</strong> <br />
@@ -516,10 +552,10 @@ function Kiosko() {
 
           <button
             onClick={confirmarOrden}
-            disabled={excedeLimite}
-            style={{ width: '100%', padding: '15px', backgroundColor: excedeLimite ? '#9ca3af' : '#10b981', color: 'white', fontSize: '1.2rem', fontWeight: 'bold', border: 'none', borderRadius: '8px', cursor: excedeLimite ? 'not-allowed' : 'pointer' }}
+            disabled={excedeLimite || !!errorStock} // 🌟 NUEVO: Se bloquea si no hay stock
+            style={{ width: '100%', padding: '15px', backgroundColor: (excedeLimite || !!errorStock) ? '#9ca3af' : '#10b981', color: 'white', fontSize: '1.2rem', fontWeight: 'bold', border: 'none', borderRadius: '8px', cursor: (excedeLimite || !!errorStock) ? 'not-allowed' : 'pointer' }}
           >
-            {excedeLimite ? 'Límite Excedido' : 'Confirmar Orden'}
+            {excedeLimite ? 'Límite Excedido' : errorStock ? 'Revisa el Stock' : 'Confirmar Orden'}
           </button>
         </div>
       )}

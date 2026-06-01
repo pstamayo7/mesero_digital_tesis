@@ -42,7 +42,8 @@ class OrdenEstructurada(BaseModel):
     respuesta_mesero: str
     numero_mesa: int = 0
     pedidos: List[ItemPedido]
-    total_pedido: float = 0.0 # 🌟 NUEVO: La cuenta final en dólares
+    total_pedido: float = 0.0 
+    error_stock: str = "" # 🌟
 
 # ... (OrdenEntrante e InteraccionBienvenida se quedan igual)
 

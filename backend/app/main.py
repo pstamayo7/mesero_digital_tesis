@@ -3,6 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import rutas_menu, rutas_voz, rutas_ordenes
 from app.api import rutas_menu, rutas_voz, rutas_ordenes, rutas_tiempos, rutas_cocina
+from fastapi import Request # Asegúrate de tener Request importado
+from app.services.ia_service import validar_stock_carrito
+import httpx # 🌟 Asegúrate de tener esto arriba con tus imports
 
 app = FastAPI(title="API Mesero Digital - Doña Zita")
 
@@ -20,6 +23,17 @@ app.add_middleware(
     # LÍNEA CLAVE: Le da permiso a React de leer las cabeceras personalizadas
     expose_headers=["X-Transcripcion", "X-Orden-JSON"], 
 )
+@app.post("/validar-carrito")
+async def validar_carrito_endpoint(request: Request):
+    """Recibe el carrito desde React cada vez que el usuario presiona '+' o '-' y valida el stock"""
+    try:
+        carrito_list = await request.json()
+        # Llamamos a nuestro Guardia de Seguridad
+        resultado = validar_stock_carrito(carrito_list)
+        return resultado # Devuelve {"valido": True} o {"valido": False, "ingrediente": "...", "stock": 3.0}
+    except Exception as e:
+        print(f"Error en endpoint validar-carrito: {e}")
+        return {"valido": True} # En caso de error, dejamos pasar
 
 # --- INCLUSIÓN DE RUTAS ---
 app.include_router(rutas_menu.router, tags=["Menú"])
