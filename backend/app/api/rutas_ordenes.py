@@ -23,7 +23,7 @@ def confirmar_orden(orden: dict):
     orden["consumo_ingredientes"] = validacion.get("consumo", {})
 
     # 3. 🚀 ENVIAMOS A N8N
-    webhook_url = "http://localhost:5678/webhook-test/orden-zita"
+    webhook_url = "http://localhost:5678/webhook/orden-zita"
     
     try:
         # Mandamos el JSON ya enriquecido con precios y consumo

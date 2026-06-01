@@ -5,8 +5,7 @@ from app.api import rutas_menu, rutas_voz, rutas_ordenes
 from app.api import rutas_menu, rutas_voz, rutas_ordenes, rutas_tiempos, rutas_cocina
 from fastapi import Request # Asegúrate de tener Request importado
 from app.services.ia_service import validar_stock_carrito
-import httpx # 🌟 Asegúrate de tener esto arriba con tus imports
-
+from app.api import rutas_caja
 app = FastAPI(title="API Mesero Digital - Doña Zita")
 
 # --- CONFIGURACIÓN CORS ACTUALIZADA ---
@@ -41,6 +40,7 @@ app.include_router(rutas_voz.router, tags=["Inteligencia Artificial"])
 app.include_router(rutas_ordenes.router, tags=["Orquestación"])
 app.include_router(rutas_tiempos.router, tags=["Gestión Operativa"])
 app.include_router(rutas_cocina.router, tags=["Monitor de Cocina"])
+app.include_router(rutas_caja.router)
 
 @app.get("/", tags=["Estado"])
 def ruta_raiz():

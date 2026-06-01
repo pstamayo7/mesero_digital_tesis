@@ -7,19 +7,44 @@ router = APIRouter()
 
 @router.get("/caja/pendientes", tags=["Caja y Facturación"])
 def obtener_cuentas_pendientes():
-    """Obtiene todas las mesas que tienen cuentas por pagar"""
+    """Obtiene todas las mesas que tienen cuentas por pagar con su desglose"""
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
+        from psycopg2.extras import RealDictCursor
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Traemos todos los pedidos que no han pagado
         query = """
-            SELECT id_pedido, id_mesa, cliente_nombre, total_final, fecha_apertura 
-            FROM Pedido 
-            WHERE estado_pago = 'PENDIENTE'
-            ORDER BY fecha_apertura ASC;
+            SELECT 
+                pe.id_pedido, 
+                pe.id_mesa, 
+                pe.cliente_nombre, 
+                pe.total_final, 
+                pe.fecha_apertura,
+                COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'cantidad', dp.cantidad,
+                                'plato', p.nombre,
+                                'notas', dp.especificaciones_ia,
+                                'subtotal', CASE 
+                                    -- Si n8n guardó el subtotal, usamos ese (precio inmutable)
+                                    WHEN dp.subtotal_calculado > 0 THEN dp.subtotal_calculado 
+                                    -- Si es un pedido viejo de prueba, calculamos precio base * cant
+                                    ELSE p.precio_base * dp.cantidad 
+                                END
+                            )
+                        )
+                        FROM Detalle_Pedido dp
+                        JOIN Plato p ON dp.id_plato = p.id_plato
+                        WHERE dp.id_pedido = pe.id_pedido AND dp.estado_item != 'CANCELADO'
+                    ), '[]'::json
+                ) as detalles
+            FROM Pedido pe 
+            WHERE pe.estado_pago = 'PENDIENTE'
+            ORDER BY pe.fecha_apertura ASC;
         """
         cursor.execute(query)
         cuentas = cursor.fetchall()
