@@ -72,21 +72,39 @@ function Kiosko() {
     }
   }, [carrito]);
 
-  // =====================================================================
-  // CARRITO TÁCTIL (Mantenido)
+ // =====================================================================
+  // CARRITO TÁCTIL (AHORA CON COSTEO MATEMÁTICO)
   // =====================================================================
   const agregarAlCarrito = (platoNombre) => {
     setCarrito(prev => {
       const index = prev.findIndex(item => item.plato === platoNombre && !item.modificaciones);
+      
+      // Buscamos el precio base del plato en el estado 'menu'
+      let precioBase = 0;
+      menu.forEach(categoria => {
+        const platoEncontrado = categoria.platos.find(p => p.nombre === platoNombre);
+        if (platoEncontrado) precioBase = platoEncontrado.precio;
+      });
+
       if (index !== -1) {
         const nuevoCarrito = [...prev];
+        const nuevaCant = parseInt(nuevoCarrito[index].cantidad) + 1;
         nuevoCarrito[index] = {
           ...nuevoCarrito[index],
-          cantidad: parseInt(nuevoCarrito[index].cantidad) + 1
+          cantidad: nuevaCant,
+          subtotal: (nuevoCarrito[index].precio_unitario || precioBase) * nuevaCant
         };
         return nuevoCarrito;
       }
-      return [...prev, { plato: platoNombre, cantidad: 1, modificaciones: "" }];
+      
+      return [...prev, { 
+        plato: platoNombre, 
+        cantidad: 1, 
+        modificaciones: "",
+        mods_estructuradas: [],
+        precio_unitario: precioBase,
+        subtotal: precioBase
+      }];
     });
   };
 
@@ -98,30 +116,19 @@ function Kiosko() {
       if (nuevaCantidad <= 0) {
         nuevoCarrito.splice(index, 1);
       } else {
+        const item = nuevoCarrito[index];
+        // Calculamos los recargos de los extras por si la IA los agregó
+        const recargosExtras = (item.mods_estructuradas || []).reduce((suma, mod) => suma + (mod.recargo || 0), 0);
+        const precioBase = item.precio_unitario || 0;
+
         nuevoCarrito[index] = {
-          ...nuevoCarrito[index],
-          cantidad: nuevaCantidad
+          ...item,
+          cantidad: nuevaCantidad,
+          subtotal: (precioBase + recargosExtras) * nuevaCantidad
         };
       }
       return nuevoCarrito;
     });
-  };
-
-  const eliminarDelCarrito = (index) => {
-    setCarrito(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const editarNota = (index) => {
-    const notaActual = carrito[index].modificaciones || "";
-    const nuevaNota = window.prompt(`Ingresa las modificaciones para ${carrito[index].plato}:`, notaActual);
-
-    if (nuevaNota !== null) {
-      setCarrito(prev => {
-        const nuevoCarrito = [...prev];
-        nuevoCarrito[index].modificaciones = nuevaNota;
-        return nuevoCarrito;
-      });
-    }
   };
 
   // =====================================================================
@@ -432,30 +439,53 @@ function Kiosko() {
               <li key={index} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #ccc', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ flex: 2, fontSize: '1.2rem' }}>{item.plato}</strong>
+                  
+                  {/* NOMBRE Y PRECIO UNITARIO */}
+                  <div style={{ flex: 2 }}>
+                    <strong style={{ fontSize: '1.2rem', display: 'block' }}>{item.plato}</strong>
+                    <span style={{ fontSize: '0.9rem', color: '#6b7280' }}>
+                      ${(item.precio_unitario || 0).toFixed(2)} c/u
+                    </span>
+                  </div>
 
-                  {/* Controles táctiles de cantidad */}
+                  {/* CONTROLES TÁCTILES DE CANTIDAD */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1, justifyContent: 'center' }}>
                     <button onClick={() => cambiarCantidad(index, -1)} style={{ width: '40px', height: '40px', fontSize: '1.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>-</button>
                     <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{item.cantidad}</span>
                     <button onClick={() => cambiarCantidad(index, 1)} style={{ width: '40px', height: '40px', fontSize: '1.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>+</button>
                   </div>
 
-                  {/* Botones de acción rápida */}
-                  <div style={{ display: 'flex', gap: '10px', flex: 1, justifyContent: 'flex-end' }}>
-                    <button onClick={() => editarNota(index)} style={{ padding: '8px 12px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>📝 Nota</button>
+                  {/* SUBTOTAL DE ESTE PLATO Y BOTONES */}
+                  <div style={{ display: 'flex', gap: '10px', flex: 1.5, justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <strong style={{ fontSize: '1.3rem', color: '#059669', marginRight: '10px' }}>
+                      ${(item.subtotal || 0).toFixed(2)}
+                    </strong>
+                    <button onClick={() => editarNota(index)} style={{ padding: '8px 12px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>📝</button>
                     <button onClick={() => eliminarDelCarrito(index)} style={{ padding: '8px 12px', backgroundColor: '#6b7280', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>🗑️</button>
                   </div>
                 </div>
 
-                {/* Mostramos la nota si existe */}
-                {item.modificaciones && (
-                  <span style={{ color: '#d9534f', fontSize: '1rem', fontStyle: 'italic' }}>
-                    * Nota: {item.modificaciones}
-                  </span>
+                {/* MODIFICACIONES Y SUS RECARGOS (El detalle) */}
+                {item.mods_estructuradas && item.mods_estructuradas.length > 0 ? (
+                  <div style={{ paddingLeft: '10px', marginTop: '5px' }}>
+                    {item.mods_estructuradas.map((mod, i) => (
+                      <div key={i} style={{ color: mod.tipo === 'EXTRA' ? '#d97706' : '#dc2626', fontSize: '0.95rem', fontStyle: 'italic', display: 'flex', justifyContent: 'space-between', maxWidth: '300px' }}>
+                        <span>* {mod.tipo} {mod.ingrediente}</span>
+                        {mod.recargo > 0 && <span>+${mod.recargo.toFixed(2)}</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  item.modificaciones && (
+                    <span style={{ color: '#d9534f', fontSize: '1rem', fontStyle: 'italic' }}>
+                      * Nota: {item.modificaciones}
+                    </span>
+                  )
                 )}
               </li>
             ))}
+
+            {/* ESTIMADOR DE TIEMPO */}
             {tiempoEstimado > 0 && (
               <div style={{ background: '#e9ecef', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #ced4da' }}>
                 <span style={{ fontSize: '1.2rem', color: '#495057', display: 'block', marginBottom: '5px' }}>
@@ -467,6 +497,15 @@ function Kiosko() {
               </div>
             )}
           </ul>
+
+          {/* 🌟 NUEVO: EL GRAN TOTAL EN DÓLARES 🌟 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e2e8f0', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #cbd5e1' }}>
+            <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#1e293b' }}>Total a Pagar:</h3>
+            <span style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#10b981' }}>
+              ${carrito.reduce((suma, item) => suma + (item.subtotal || 0), 0).toFixed(2)}
+            </span>
+          </div>
+
           {excedeLimite && (
             <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #f87171' }}>
               <strong>⚠️ ¡Qué gran apetito!</strong> <br />

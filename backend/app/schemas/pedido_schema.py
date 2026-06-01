@@ -7,10 +7,7 @@ class TipoMod(str, Enum):
     EXTRA = "EXTRA"
     SIN = "SIN"
 
-# 2. Estructura exacta de una modificación
-class ModificacionStruct(BaseModel):
-    tipo: str = Field(description="Debe ser 'EXTRA' o 'SIN'")
-    ingrediente: str = Field(description="Nombre del ingrediente")
+
 
 class AccionLLM(BaseModel):
     accion: str = Field(description="'AGREGAR' o 'QUITAR'")
@@ -26,16 +23,28 @@ class SalidaLLM(BaseModel):
     acciones: List[AccionLLM]
 
 # 4. Lo que le enviaremos de regreso a React (El carrito final calculado por Python)
+class ModificacionStruct(BaseModel):
+    tipo: str = Field(description="Debe ser 'EXTRA', 'SIN', o 'POCO'")
+    ingrediente: str = Field(description="Nombre del ingrediente")
+    recargo: float = 0.0 # 🌟 NUEVO: Para enviar cuánto costó este extra
+
+
+
 class ItemPedido(BaseModel):
     plato: str
     cantidad: int
-    modificaciones: str = "" # Para mostrar visualmente en el frontend actual
-    mods_estructuradas: List[ModificacionStruct] = [] # Para calcular precios y stock más adelante
+    modificaciones: str = ""
+    mods_estructuradas: List[ModificacionStruct] = []
+    precio_unitario: float = 0.0 # 🌟 NUEVO: El precio base de PostgreSQL
+    subtotal: float = 0.0 # 🌟 NUEVO: (precio base + recargos) * cantidad
 
 class OrdenEstructurada(BaseModel):
     respuesta_mesero: str
     numero_mesa: int = 0
     pedidos: List[ItemPedido]
+    total_pedido: float = 0.0 # 🌟 NUEVO: La cuenta final en dólares
+
+# ... (OrdenEntrante e InteraccionBienvenida se quedan igual)
 
 class OrdenEntrante(BaseModel):
     id_mesa: int

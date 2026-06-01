@@ -20,7 +20,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO Pedido (id_mesa, estado_pago, subtotal, total_final)\nVALUES ({{ $json.body.id_mesa }}, 'PENDIENTE', 0.00, 0.00)\nRETURNING id_pedido;",
+        "query": "INSERT INTO Pedido (id_mesa, cliente_nombre, estado_pago, subtotal, total_final)\nVALUES ({{ $json.body.id_mesa }}, '{{ $json.body.cliente_nombre }}', 'PENDIENTE', 0.00, 0.00)\nRETURNING id_pedido;",
         "options": {}
       },
       "id": "b70ae773-3136-4f89-b186-48c0bd513abc",
@@ -144,12 +144,12 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "09e770df-ee6b-4ead-b7f6-3e25f8d36df6",
+  "versionId": "d572e2da-d984-4fa2-b780-7ea501226879",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "e6a3a08ad7dd4ec5c75e880b663cd6b6a1c0afebf120f6b8b363394c37789224"

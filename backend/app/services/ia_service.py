@@ -34,6 +34,26 @@ def obtener_ingredientes_disponibles():
     except Exception as e:
         print(f"⚠️ Error BD Ingredientes: {e}")
         return ["Mote", "Tostado", "Maduro", "Cebolla", "Chicharrón", "Aguacate", "Tomate"]
+def obtener_diccionario_precios():
+    """Obtiene los precios base de platos y extras de una sola vez."""
+    try:
+        conexion = get_db_connection()
+        cursor = conexion.cursor()
+
+        # Extraemos { "fritada tradicional": 5.00, "llapingachos": 3.50 }
+        cursor.execute("SELECT nombre, precio_base FROM Plato;")
+        platos = {row[0].lower(): float(row[1]) for row in cursor.fetchall()}
+
+        # Extraemos { "mote": 0.50, "aguacate": 1.00 }
+        cursor.execute("SELECT nombre, precio_extra FROM Ingrediente;")
+        extras = {row[0].lower(): float(row[1]) for row in cursor.fetchall()}
+
+        cursor.close()
+        conexion.close()
+        return platos, extras
+    except Exception as e:
+        print(f"⚠️ Error BD Precios: {e}")
+        return {}, {}
 
 def generar_voz_offline(texto: str, ruta_salida: str):
     """Genera un archivo de audio usando el motor local de la computadora (Edge AI)"""
@@ -93,43 +113,35 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
 
     1. FORMATO DE MODIFICACIONES (ANTI-CRASH):
        - El campo "modificaciones" SIEMPRE, SIEMPRE debe ser una lista.
-       - Si el plato es normal, usa EXACTAMENTE []. ¡NUNCA uses un string como ""!
-       - Tipos permitidos: "SIN", "EXTRA", "POCO".
-       - 🚫 ESTRICTAMENTE PROHIBIDO usar "CON". Si el cliente pide algo "con [ingrediente base]" o "normal", significa que no hay alteraciones. ¡Usa []!
+       - Si el plato es normal, usa EXACTAMENTE [].
+       - Si hay modificaciones, usa OBLIGATORIAMENTE objetos: [{{"tipo": "EXTRA", "ingrediente": "Mote"}}].
+       - 🚫 ESTRICTAMENTE PROHIBIDO usar listas de strings como ["EXTRA Mote"]. ¡Solo objetos JSON!
+       - Tipos permitidos: "SIN", "EXTRA", "POCO". NUNCA "CON".
 
     2. MATEMÁTICA DE SUBDIVISIÓN (Pedidos Nuevos):
        - Si pide "N" platos en total, pero "M" tienen cambios, RESTA (N - M).
-       - Ejemplo: "3 fritadas, 1 sin mote" -> AGREGAR 2 normales ([]), AGREGAR 1 modificada ([SIN Mote]).
+       - Ejemplo: "3 fritadas, 1 sin mote" -> AGREGAR 2 normales ([]), AGREGAR 1 modificada ([{{"tipo": "SIN", "ingrediente": "Mote"}}]).
 
-    3. INTERCAMBIO (Modificar carrito):
-       - Si el cliente modifica algo que YA ESTÁ en el carrito, debes QUITAR el plato original y AGREGAR el nuevo.
+   3. ⚠️ INTERCAMBIO vs REPETICIÓN (¡DIFERENCIA VITAL!):
+       - REPETICIÓN (CLONAR): Si el cliente quiere OTRO plato IGUAL (ej. "agrega otra igual", "otra con los mismos extras"), NO QUITES NADA. Solo usa AGREGAR y copia las modificaciones del carrito.
+       - INTERCAMBIO (MODIFICAR): SOLO si el cliente quiere ALTERAR un plato que ya pidió (ej. "a la fritada que ya tengo, quítale el mote"), debes QUITAR el plato viejo y AGREGAR el nuevo modificado.
+
+    4. ⚠️ PORCIONES SUELTAS (EXTRAS COMO PLATO INDIVIDUAL):
+       - Si el cliente pide un ingrediente de forma independiente (ej. "dame un maduro", "una porción de tostado", "y un mote aparte"), NO lo pongas como modificación de un plato.
+       - Debes AGREGARLO como un plato nuevo, y su nombre debe empezar SIEMPRE con la frase "Porción de " seguido del ingrediente. (Ej. "plato": "Porción de Plátano Maduro").
 
     💡 EJEMPLOS DE RAZONAMIENTO Y JSON:
 
     EJEMPLO 1 (Subdivisión matemática):
-    Cliente: "Necesito tres Fritadas especiales dobles, pero dos de ellas sin mote"
+    Cliente: "Necesito tres Fritadas, pero dos sin mote"
     JSON:
     {{
-        "razonamiento": "Pide 3 Especiales Dobles en total. 2 son SIN Mote. Matemática: 3 - 2 = 1 normal. Acciones: AGREGAR 1 normal, AGREGAR 2 sin mote.",
+        "razonamiento": "Pide 3 en total. 2 son SIN Mote. 3 - 2 = 1 normal. Acciones: AGREGAR 1 normal, AGREGAR 2 sin mote.",
         "respuesta_mesero": "¡Entendido! Dos sin mote y una normal.",
         "numero_mesa": 0,
         "acciones": [
-            {{ "accion": "AGREGAR", "plato": "Fritada Especial Doble", "cantidad": 1, "modificaciones": [] }},
-            {{ "accion": "AGREGAR", "plato": "Fritada Especial Doble", "cantidad": 2, "modificaciones": [{{"tipo": "SIN", "ingrediente": "Mote"}}] }}
-        ]
-    }}
-
-    EJEMPLO 2 (Modificar carrito existente):
-    Carrito: [{{ "plato": "Fritada Tradicional", "cantidad": 2, "modificaciones": "" }}]
-    Cliente: "Puedes hacer que una de las fritadas tradicionales sea sin mote"
-    JSON:
-    {{
-        "razonamiento": "El carrito tiene Tradicionales normales. El cliente quiere cambiar 1 a SIN Mote. Debo QUITAR 1 Tradicional normal ([]), y AGREGAR 1 Tradicional SIN Mote.",
-        "respuesta_mesero": "Claro, modifiqué una para que sea sin mote.",
-        "numero_mesa": 0,
-        "acciones": [
-            {{ "accion": "QUITAR", "plato": "Fritada Tradicional", "cantidad": 1, "modificaciones": [] }},
-            {{ "accion": "AGREGAR", "plato": "Fritada Tradicional", "cantidad": 1, "modificaciones": [{{"tipo": "SIN", "ingrediente": "Mote"}}] }}
+            {{ "accion": "AGREGAR", "plato": "Fritada Tradicional", "cantidad": 1, "modificaciones": [] }},
+            {{ "accion": "AGREGAR", "plato": "Fritada Tradicional", "cantidad": 2, "modificaciones": [{{"tipo": "SIN", "ingrediente": "Mote"}}] }}
         ]
     }}
 
@@ -198,20 +210,35 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
         numero_mesa_final = intenciones.numero_mesa if intenciones.numero_mesa != 0 else estado_previo.get("numero_mesa", 0)
         
         # 2. MATEMÁTICAS INDESTRUCTIBLES
+      # 🌟 TRAEMOS LOS PRECIOS AQUÍ ARRIBA PARA NORMALIZAR LOS NOMBRES ANTES DE AGRUPAR
+        precios_platos, precios_extras = obtener_diccionario_precios()
+
+        # 2. MATEMÁTICAS INDESTRUCTIBLES
         for accion in intenciones.acciones:
-            # Aseguramos que modificaciones sea una lista y normalizamos a MAYÚSCULAS
             mods_lista = accion.modificaciones if accion.modificaciones else []
+            
+            # 🌟 NORMALIZAMOS LOS NOMBRES DE LOS INGREDIENTES
             for m in mods_lista:
-                m.tipo = m.tipo.upper() # Transformamos "sin" a "SIN"
+                m.tipo = m.tipo.upper() 
+                nombre_ing_low = m.ingrediente.strip().lower()
                 
-            # Creamos el string visual (ej. "SIN Mote, EXTRA Cebolla")
+                # Buscamos su nombre oficial en la base de datos
+                for db_nombre in precios_extras.keys():
+                    if nombre_ing_low in db_nombre or db_nombre in nombre_ing_low:
+                        # Lo renombramos a su versión limpia (ej. "Mote Cocinado")
+                        m.ingrediente = db_nombre.split("(")[0].strip().title()
+                        break
+            
+            # 🌟 ORDENAMOS ALFABÉTICAMENTE PARA QUE EL ORDEN NO IMPORTE 🌟
+            mods_lista = sorted(mods_lista, key=lambda x: f"{x.tipo} {x.ingrediente}")
+            
+            # Ahora sí creamos el string visual uniforme (siempre estará en el mismo orden y con el mismo nombre)
             mods_str = ", ".join([f"{m.tipo} {m.ingrediente}" for m in mods_lista])
             
             plato_encontrado = False
             for item in carrito_list:
                 item_mods = item.get("modificaciones", "")
                 
-                # Comparamos ignorando mayúsculas/minúsculas
                 if item.get("plato", "").lower() == accion.plato.lower() and item_mods == mods_str:
                     if accion.accion.upper() == "AGREGAR":
                         item["cantidad"] = item.get("cantidad", 0) + accion.cantidad
@@ -220,7 +247,6 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
                     plato_encontrado = True
                     break
             
-            # Si no estaba y es AGREGAR, lo creamos
             if not plato_encontrado and accion.accion.upper() == "AGREGAR":
                 carrito_list.append({
                     "plato": accion.plato,
@@ -229,26 +255,83 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
                     "mods_estructuradas": [m.model_dump() for m in mods_lista]
                 })
         
-        # Filtramos los platos que el cliente canceló (cantidad <= 0)
+        # Filtramos los platos que el cliente canceló
         carrito_list = [item for item in carrito_list if item["cantidad"] > 0]
         
+        
+        
+        total_final = 0.0
+
+        for item in carrito_list:
+            nombre_plato_low = item["plato"].lower()
+            
+            # 1. Buscamos el precio base en la tabla PLATOS
+            precio_base = precios_platos.get(nombre_plato_low, 0.0) 
+            
+            # 🌟 2. NUEVO: SI ES UNA PORCIÓN, SACAMOS EL PRECIO DE LA TABLA INGREDIENTES 🌟
+            if precio_base == 0.0 and nombre_plato_low.startswith("porción de"):
+                ingrediente_solo = nombre_plato_low.replace("porción de", "").strip()
+                
+                for db_nombre, db_precio in precios_extras.items():
+                    if ingrediente_solo in db_nombre or db_nombre in ingrediente_solo:
+                        precio_base = db_precio
+                        nombre_limpio = db_nombre.split("(")[0].strip().title()
+                        item["plato"] = f"Porción de {nombre_limpio}"
+                        print(f"🍟 Porción detectada: '{nombre_limpio}' a ${precio_base}")
+                        break
+            
+            recargo_total_mods = 0.0
+            
+           # Costear las modificaciones
+            for mod in item.get("mods_estructuradas", []):
+                if mod.get("tipo", "").strip().upper() == "EXTRA":
+                    nombre_ing_low = mod.get("ingrediente", "").strip().lower()
+                    costo_extra = 0.0
+                    nombre_oficial = nombre_ing_low
+                    
+                    # 🌟 BÚSQUEDA FLEXIBLE (El parche para el "kg" y "u") 🌟
+                    for db_nombre, db_precio in precios_extras.items():
+                        # Si "mote" está dentro de "mote cocinado (kg)" (o viceversa)
+                        if nombre_ing_low in db_nombre or db_nombre in nombre_ing_low:
+                            costo_extra = db_precio
+                            # De paso, limpiamos el "(kg)" para que en React se vea bonito
+                            nombre_oficial = db_nombre.split("(")[0].strip().title()
+                            break
+                            
+                    print(f"🔎 Buscando EXTRA: '{nombre_ing_low}' -> Encontrado como '{nombre_oficial}' con Costo: ${costo_extra}")
+                    
+                    mod["ingrediente"] = nombre_oficial # Actualizamos el nombre para el Frontend
+                    mod["recargo"] = costo_extra
+                    recargo_total_mods += costo_extra
+                else:
+                    # Si es "SIN" o "POCO", no cuesta extra
+                    mod["recargo"] = 0.0
+
+            # Guardamos la matemática en el item
+            item["precio_unitario"] = precio_base
+            item["subtotal"] = (precio_base + recargo_total_mods) * item["cantidad"]
+            total_final += item["subtotal"]
+
         # Validamos el límite operativo
         total_platos = sum([item.get("cantidad", 0) for item in carrito_list])
         if total_platos > limite_maximo:
             return {
                 "exito": True,
                 "transcripcion": texto_completo,
-                "orden": {"pedidos": estado_previo.get("pedidos", []), "numero_mesa": numero_mesa_final},
-                "ruta_audio": "limite_excedido.wav" # Cambia esto por tu audio de límite
+                "orden": {"pedidos": estado_previo.get("pedidos", []), "numero_mesa": numero_mesa_final, "total_pedido": estado_previo.get("total_pedido", 0.0)},
+                "ruta_audio": "limite_excedido.wav" 
             }
 
         # Estructuramos la salida para React
-       # Estructuramos la salida para React
         orden_final = OrdenEstructurada(
             respuesta_mesero=intenciones.respuesta_mesero,
             numero_mesa=numero_mesa_final,
-            pedidos=carrito_list
+            pedidos=carrito_list,
+            total_pedido=total_final # 🌟 Enviamos el total global al frontend
         )
+       
+
+       
         
         # 🌟 EL BLINDAJE CONTRA TEXTOS VACÍOS 🌟
         texto_a_hablar = orden_final.respuesta_mesero.strip()
