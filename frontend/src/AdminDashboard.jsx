@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AdminReportes from './AdminReportes'
 
 export default function AdminDashboard() {
   const [tabActiva, setTabActiva] = useState('platos');
@@ -123,23 +124,53 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div style={{ padding: '30px', fontFamily: '"Inter", sans-serif', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#f4f7f6', minHeight: '100vh' }}>
+  <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: '"Inter", sans-serif' }}>
+    
+    {/* ================= ASIDE (BARRA LATERAL) ================= */}
+    <aside style={{ width: '260px', backgroundColor: '#1e293b', color: 'white', display: 'flex', flexDirection: 'column', boxShadow: '4px 0 10px rgba(0,0,0,0.1)', zIndex: 10 }}>
+      <div style={{ padding: '20px', borderBottom: '1px solid #334155', textAlign: 'center' }}>
+        <h2 style={{ margin: 0, color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+          ⚙️ Zita Admin
+        </h2>
+      </div>
+      
+      <nav style={{ display: 'flex', flexDirection: 'column', padding: '20px 0' }}>
+        {[
+          { id: 'reportes', icono: '📊', texto: 'Reportes & IA' },
+          { id: 'platos', icono: '🍔', texto: 'Menú & Recetas' },
+          { id: 'ingredientes', icono: '📦', texto: 'Inventario' },
+          { id: 'configuracion', icono: '🎛️', texto: 'Configuración' }
+        ].map(item => (
+          <button 
+            key={item.id} 
+            onClick={() => setTabActiva(item.id)}
+            style={{ 
+              padding: '15px 25px', textAlign: 'left', fontSize: '15px', border: 'none', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'center', transition: '0.2s',
+              backgroundColor: tabActiva === item.id ? '#334155' : 'transparent',
+              color: tabActiva === item.id ? '#10b981' : '#cbd5e1',
+              borderLeft: tabActiva === item.id ? '4px solid #10b981' : '4px solid transparent',
+              fontWeight: tabActiva === item.id ? 'bold' : 'normal'
+            }}
+          >
+            <span style={{ fontSize: '18px' }}>{item.icono}</span> {item.texto}
+          </button>
+        ))}
+      </nav>
+    </aside>
+
+    {/* ================= CONTENIDO PRINCIPAL ================= */}
+    <main style={{ flex: 1, padding: '40px', overflowY: 'auto', backgroundColor: '#f1f5f9' }}>
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: '#1e293b', margin: 0 }}>⚙️ Panel de Administración</h1>
+        <h1 style={{ color: '#0f172a', margin: 0, textTransform: 'capitalize' }}>
+          {tabActiva === 'reportes' ? 'Análisis de Datos' : tabActiva === 'platos' ? 'Gestión de Menú' : tabActiva === 'ingredientes' ? 'Control de Stock' : 'Configuración'}
+        </h1>
         {mensaje && <div style={{ backgroundColor: '#10b981', color: 'white', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', animation: 'fadeIn 0.5s' }}>{mensaje}</div>}
       </div>
 
-      {/* NAVEGACIÓN MODERNA */}
-      <div style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
-        {['platos', 'ingredientes', 'configuracion'].map(tab => (
-          <button key={tab} onClick={() => setTabActiva(tab)}
-            style={{ padding: '12px 24px', fontSize: '16px', textTransform: 'capitalize', backgroundColor: tabActiva === tab ? '#10b981' : 'white', color: tabActiva === tab ? 'white' : '#64748b', border: tabActiva === tab ? 'none' : '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-            {tab === 'platos' ? '🍔 Menú & Recetas' : tab === 'ingredientes' ? '📦 Inventario' : '🎛️ Config. Operativa'}
-          </button>
-        ))}
-      </div>
-
+      {/* --- INYECTAMOS LOS MÓDULOS AQUÍ --- */}
+      {tabActiva === 'reportes' && <AdminReportes />}
+      
       {/* ================= PESTAÑA: PLATOS ================= */}
       {tabActiva === 'platos' && (
         <div style={theme.card}>
@@ -184,7 +215,7 @@ export default function AdminDashboard() {
           </table>
         </div>
       )}
-
+      
       {/* ================= PESTAÑA: INGREDIENTES ================= */}
       {tabActiva === 'ingredientes' && (
         <div style={theme.card}>
@@ -247,7 +278,7 @@ export default function AdminDashboard() {
           </table>
         </div>
       )}
-
+      
       {/* ================= PESTAÑA: CONFIGURACIÓN ================= */}
       {tabActiva === 'configuracion' && (
         <div style={{...theme.card, maxWidth: '600px', margin: '0 auto'}}>
@@ -262,53 +293,55 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ================= MODAL DE RECETAS ================= */}
-      {modalReceta.visible && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' }}>
-          <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '500px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-            <h2 style={{ marginTop: 0, color: '#1e293b' }}>Receta: {modalReceta.plato.nombre}</h2>
-            
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-              <select style={theme.input} value={nuevoIngReceta.id_ingrediente} onChange={e => setNuevoIngReceta({...nuevoIngReceta, id_ingrediente: e.target.value})}>
-                <option value="">Selecciona Ingrediente...</option>
-                {ingredientes.map(ing => <option key={ing.id_ingrediente} value={ing.id_ingrediente}>{ing.nombre}</option>)}
-              </select>
-              <input type="number" step="0.1" style={{...theme.input, width: '90px'}} placeholder="Cant." value={nuevoIngReceta.cantidad_base} onChange={e => setNuevoIngReceta({...nuevoIngReceta, cantidad_base: e.target.value})} />
-              <button style={theme.btnPrimary} onClick={agregarAReceta}>Añadir</button>
-            </div>
+    </main>
 
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {modalReceta.ingredientesReceta.length === 0 ? <p style={{ color: '#94a3b8', textAlign: 'center' }}>No hay ingredientes asignados.</p> : null}
-              {modalReceta.ingredientesReceta.map(item => (
-                <li key={item.id_ingrediente} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: '1px solid #e2e8f0', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 'bold', color: '#334155' }}>{item.ingrediente_nombre}</span>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b', fontSize: '14px' }}>Cant:</span>
-                    <input 
-                      type="number" step="0.1" style={{...theme.input, width: '70px', padding: '5px', textAlign: 'center'}} 
-                      defaultValue={item.cantidad_base} 
-                      onBlur={async (e) => {
-                        const nuevaCant = parseFloat(e.target.value);
-                        if(nuevaCant !== item.cantidad_base && !isNaN(nuevaCant)) {
-                          const body = { id_plato: modalReceta.plato.id_plato, id_ingrediente: item.id_ingrediente, cantidad_base: nuevaCant };
-                          await fetch('http://localhost:8000/admin/receta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-                          abrirReceta(modalReceta.plato);
-                        }
-                      }} 
-                    />
-                    <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold', fontSize: '18px', marginLeft: '5px' }} onClick={() => quitarDeReceta(item.id_ingrediente)}>✖</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            <button style={{...theme.btnSecondary, width: '100%', marginTop: '20px', padding: '12px'}} onClick={() => setModalReceta({ visible: false, plato: null, ingredientesReceta: [] })}>
-              Cerrar Ventana
-            </button>
+    {/* ================= MODAL DE RECETAS ================= */}
+    {modalReceta.visible && (
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' }}>
+        <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '500px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Receta: {modalReceta.plato.nombre}</h2>
+          
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+            <select style={theme.input} value={nuevoIngReceta.id_ingrediente} onChange={e => setNuevoIngReceta({...nuevoIngReceta, id_ingrediente: e.target.value})}>
+              <option value="">Selecciona Ingrediente...</option>
+              {ingredientes.map(ing => <option key={ing.id_ingrediente} value={ing.id_ingrediente}>{ing.nombre}</option>)}
+            </select>
+            <input type="number" step="0.1" style={{...theme.input, width: '90px'}} placeholder="Cant." value={nuevoIngReceta.cantidad_base} onChange={e => setNuevoIngReceta({...nuevoIngReceta, cantidad_base: e.target.value})} />
+            <button style={theme.btnPrimary} onClick={agregarAReceta}>Añadir</button>
           </div>
-        </div>
-      )}
 
-    </div>
-  );
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {modalReceta.ingredientesReceta.length === 0 ? <p style={{ color: '#94a3b8', textAlign: 'center' }}>No hay ingredientes asignados.</p> : null}
+            {modalReceta.ingredientesReceta.map(item => (
+              <li key={item.id_ingrediente} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontWeight: 'bold', color: '#334155' }}>{item.ingrediente_nombre}</span>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span style={{ color: '#64748b', fontSize: '14px' }}>Cant:</span>
+                  <input 
+                    type="number" step="0.1" style={{...theme.input, width: '70px', padding: '5px', textAlign: 'center'}} 
+                    defaultValue={item.cantidad_base} 
+                    onBlur={async (e) => {
+                      const nuevaCant = parseFloat(e.target.value);
+                      if(nuevaCant !== item.cantidad_base && !isNaN(nuevaCant)) {
+                        const body = { id_plato: modalReceta.plato.id_plato, id_ingrediente: item.id_ingrediente, cantidad_base: nuevaCant };
+                        await fetch('http://localhost:8000/admin/receta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                        abrirReceta(modalReceta.plato);
+                      }
+                    }} 
+                  />
+                  <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold', fontSize: '18px', marginLeft: '5px' }} onClick={() => quitarDeReceta(item.id_ingrediente)}>✖</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <button style={{...theme.btnSecondary, width: '100%', marginTop: '20px', padding: '12px'}} onClick={() => setModalReceta({ visible: false, plato: null, ingredientesReceta: [] })}>
+            Cerrar Ventana
+          </button>
+        </div>
+      </div>
+    )}
+
+  </div>
+);
 }

@@ -567,3 +567,35 @@ def procesar_audio_bienvenida(ruta_temporal_audio: str, estado_actual_nombre: st
     except Exception as e:
         print("⚠️ Error JSON en Bienvenida:", e)
         return {"exito": False, "error": "Fallo lógico en IA de bienvenida"}
+
+def generar_analisis_negocio(kpis: dict, platos: dict, operacion: dict):
+
+    # Extraemos los datos más relevantes para no saturar el contexto del LLM
+    ingresos = kpis.get('ingresos', 0)
+    ticket_promedio = kpis.get('ticket', 0)
+    top_platos = ", ".join(platos.get('labels', [])[:3]) if platos.get('labels') else "Sin datos"
+
+    prompt = f"""
+    Eres un gerente experto en operaciones de restaurantes. Analiza los siguientes datos reales de este periodo:
+    - Ingresos totales: ${ingresos}
+    - Ticket promedio: ${ticket_promedio}
+    - Platos más vendidos: {top_platos}
+
+    Basado en esto, redacta un análisis gerencial en 3 párrafos cortos:
+    1. Resumen del rendimiento financiero.
+    2. Evaluación de los platos estrella.
+    3. Una recomendación operativa concreta para mejorar tiempos o ventas.
+
+    Responde con un 
+    """
+
+    try:
+        respuesta_llm = ollama.chat(
+            model='llama3',
+            messages=[{'role': 'user', 'content': prompt}],
+            options={'temperature': 0.6} # Un poco de creatividad, pero enfocado en los datos
+        )
+        return respuesta_llm['message']['content']
+    except Exception as e:
+        print(f"Error generando análisis de BI: {e}")
+        return "No se pudo generar el análisis en este momento debido a un error interno."

@@ -7,7 +7,7 @@ from fastapi import Request # Asegúrate de tener Request importado
 from app.services.ia_service import validar_stock_carrito
 from app.api import rutas_caja
 from app.api import rutas_admin
-
+from app.api import rutas_reportes
 
 app = FastAPI(title="API Mesero Digital - Doña Zita")
 
@@ -45,7 +45,7 @@ app.include_router(rutas_tiempos.router, tags=["Gestión Operativa"])
 app.include_router(rutas_cocina.router, tags=["Monitor de Cocina"])
 app.include_router(rutas_caja.router)
 app.include_router(rutas_admin.router)
-
+app.include_router(rutas_reportes.router, prefix="/admin", tags=["Reportes"])
 @app.get("/", tags=["Estado"])
 def ruta_raiz():
     return {"mensaje": "¡El servidor de Fritadas Doña Zita está en línea!"}
