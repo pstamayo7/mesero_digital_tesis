@@ -1,0 +1,135 @@
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional
+from psycopg2.extras import RealDictCursor
+from app.core.database import get_db
+
+router = APIRouter(prefix="/admin", tags=["Administración"])
+
+# ==========================================
+# ESQUEMAS PYDANTIC
+# ==========================================
+class ConfigOperativaUpdate(BaseModel):
+    max_platos_kiosko: int
+    capacidad_paila_cocina: int
+    cantidad_cocineros: int
+    porcentaje_tiempo_extra: float
+    total_paletas: int
+
+class IngredienteBase(BaseModel):
+    nombre: str
+    stock_actual: float
+    precio_extra: float
+
+class PlatoBase(BaseModel):
+    id_categoria: int
+    nombre: str
+    precio_base: float
+    requiere_coccion: bool
+    tiempo_prep_min: int
+
+class RecetaItem(BaseModel):
+    id_plato: int
+    id_ingrediente: int
+    cantidad_base: float  # 🌟 CORREGIDO AQUÍ
+
+# ==========================================
+# RUTAS DE CONFIGURACIÓN
+# ==========================================
+@router.get("/configuracion")
+def obtener_configuracion(db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor) 
+    cursor.execute("SELECT * FROM configuracion_operativa LIMIT 1;")
+    config = cursor.fetchone()
+    return config if config else {"max_platos_kiosko": 10, "capacidad_paila_cocina": 5, "cantidad_cocineros": 2, "porcentaje_tiempo_extra": 0.10, "total_paletas": 20}
+
+@router.put("/configuracion")
+def actualizar_configuracion(config_data: ConfigOperativaUpdate, db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT id_config FROM configuracion_operativa LIMIT 1;")
+    existe = cursor.fetchone()
+    if existe:
+        cursor.execute("UPDATE configuracion_operativa SET max_platos_kiosko=%s, capacidad_paila_cocina=%s, cantidad_cocineros=%s, porcentaje_tiempo_extra=%s, total_paletas=%s WHERE id_config=%s", 
+                       (config_data.max_platos_kiosko, config_data.capacidad_paila_cocina, config_data.cantidad_cocineros, config_data.porcentaje_tiempo_extra, config_data.total_paletas, existe['id_config']))
+    else:
+        cursor.execute("INSERT INTO configuracion_operativa (max_platos_kiosko, capacidad_paila_cocina, cantidad_cocineros, porcentaje_tiempo_extra, total_paletas) VALUES (%s, %s, %s, %s, %s)", 
+                       (config_data.max_platos_kiosko, config_data.capacidad_paila_cocina, config_data.cantidad_cocineros, config_data.porcentaje_tiempo_extra, config_data.total_paletas))
+    db.commit()
+    return {"mensaje": "Configuración actualizada"}
+
+# ==========================================
+# RUTAS DE INVENTARIO E INGREDIENTES
+# ==========================================
+@router.get("/ingredientes")
+def obtener_ingredientes(db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM ingrediente ORDER BY nombre ASC;")
+    return cursor.fetchall() 
+
+@router.post("/ingredientes")
+def crear_ingrediente(ing: IngredienteBase, db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("INSERT INTO ingrediente (nombre, stock_actual, precio_extra) VALUES (%s, %s, %s) RETURNING id_ingrediente;", (ing.nombre, ing.stock_actual, ing.precio_extra))
+    id_nuevo = cursor.fetchone()['id_ingrediente']
+    db.commit()
+    return {"mensaje": "Ingrediente creado", "id_ingrediente": id_nuevo}
+
+@router.put("/ingredientes/{id_ingrediente}")
+def editar_ingrediente(id_ingrediente: int, ing: IngredienteBase, db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("UPDATE ingrediente SET nombre=%s, stock_actual=%s, precio_extra=%s WHERE id_ingrediente=%s", (ing.nombre, ing.stock_actual, ing.precio_extra, id_ingrediente))
+    db.commit()
+    return {"mensaje": "Ingrediente actualizado"}
+
+# ==========================================
+# RUTAS DE MENÚ (PLATOS)
+# ==========================================
+@router.get("/platos")
+def obtener_platos_admin(db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT p.*, c.nombre as categoria_nombre FROM plato p LEFT JOIN categoria c ON p.id_categoria = c.id_categoria ORDER BY c.nombre ASC, p.nombre ASC;")
+    return cursor.fetchall()
+
+@router.post("/platos")
+def crear_plato(plato: PlatoBase, db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("INSERT INTO plato (id_categoria, nombre, precio_base, requiere_coccion, tiempo_prep_min) VALUES (%s, %s, %s, %s, %s) RETURNING id_plato;", 
+                   (plato.id_categoria, plato.nombre, plato.precio_base, plato.requiere_coccion, plato.tiempo_prep_min))
+    id_nuevo = cursor.fetchone()['id_plato']
+    db.commit()
+    return {"mensaje": "Plato creado", "id_plato": id_nuevo}
+
+@router.put("/platos/{id_plato}")
+def editar_plato(id_plato: int, plato: PlatoBase, db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("UPDATE plato SET nombre=%s, precio_base=%s, requiere_coccion=%s, tiempo_prep_min=%s WHERE id_plato=%s", 
+                   (plato.nombre, plato.precio_base, plato.requiere_coccion, plato.tiempo_prep_min, id_plato))
+    db.commit()
+    return {"mensaje": "Plato actualizado"}
+
+# ==========================================
+# RUTAS DE RECETAS (¡NUEVO!)
+# ==========================================
+@router.get("/receta/{id_plato}")
+def obtener_receta(id_plato: int, db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("""
+        SELECT r.id_ingrediente, r.cantidad_base, i.nombre as ingrediente_nombre, i.stock_actual
+        FROM receta r JOIN ingrediente i ON r.id_ingrediente = i.id_ingrediente WHERE r.id_plato = %s
+    """, (id_plato,)) # 🌟 CORREGIDO AQUÍ
+    return cursor.fetchall()
+
+@router.post("/receta")
+def agregar_ingrediente_receta(receta: RecetaItem, db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("DELETE FROM receta WHERE id_plato=%s AND id_ingrediente=%s", (receta.id_plato, receta.id_ingrediente))
+    cursor.execute("INSERT INTO receta (id_plato, id_ingrediente, cantidad_base) VALUES (%s, %s, %s)", (receta.id_plato, receta.id_ingrediente, receta.cantidad_base)) # 🌟 CORREGIDO AQUÍ
+    db.commit()
+    return {"mensaje": "Receta actualizada"}
+
+@router.delete("/receta/{id_plato}/{id_ingrediente}")
+def quitar_ingrediente_receta(id_plato: int, id_ingrediente: int, db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("DELETE FROM receta WHERE id_plato=%s AND id_ingrediente=%s", (id_plato, id_ingrediente))
+    db.commit()
+    return {"mensaje": "Ingrediente quitado de la receta"}

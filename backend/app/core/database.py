@@ -10,3 +10,11 @@ def get_db_connection():
         user="admin",
         password="adminpassword"
     )
+
+def get_db():
+    """Dependencia de FastAPI para manejar la conexión de forma segura."""
+    conn = get_db_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()

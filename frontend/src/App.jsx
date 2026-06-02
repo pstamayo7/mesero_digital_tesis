@@ -1,46 +1,67 @@
 // src/App.jsx
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
-import Kiosko from './Kiosko'
-import MonitorCocina from './MonitorCocina'
-import PantallaTurnos from './PantallaTurnos' 
-import Caja from './caja' // 🌟 IMPORTAMOS LA CAJA
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+
+// 📦 Importación de Pantallas
+import Kiosko from './Kiosko';
+import MonitorCocina from './MonitorCocina';
+import PantallaTurnos from './PantallaTurnos';
+import Caja from './caja';
+import AdminDashboard from './AdminDashboard';
 
 function App() {
+  // 🎨 Estilos reutilizables para los botones del menú superior
+  const linkStyle = {
+    color: '#f8fafc', // Blanco hueso
+    textDecoration: 'none',
+    fontWeight: 'bold',
+    fontSize: '1rem',
+  };
+
+  const adminStyle = {
+    ...linkStyle,
+    color: '#10b981', // Verde esmeralda para módulos administrativos
+  };
+
   return (
     <Router>
-      {/* 🧭 Barra de navegación técnica (Utilidad oculta para desarrollo / simulación de terminales) */}
-      <nav style={{ background: '#1e293b', padding: '10px', display: 'flex', gap: '20px', justifyContent: 'center', borderBottom: '2px solid #334155' }}>
-        <Link to="/" style={{ color: '#f8fafc', textDecoration: 'none', fontWeight: 'bold', fontSize: '1rem' }}>
-          📱 Vista Kiosko
-        </Link>
-        <Link to="/cocina" style={{ color: '#f8fafc', textDecoration: 'none', fontWeight: 'bold', fontSize: '1rem' }}>
-          👨‍🍳 Monitor Cocina
-        </Link>
-        <Link to="/turnos" style={{ color: '#f8fafc', textDecoration: 'none', fontWeight: 'bold', fontSize: '1rem' }}>
-          📺 Pantalla Turnos
-        </Link>
-        {/* 🌟 NUEVO ENLACE PARA LA CAJA */}
-        <Link to="/caja" style={{ color: '#10b981', textDecoration: 'none', fontWeight: 'bold', fontSize: '1rem' }}>
-          💵 Caja / Cobros
-        </Link>
+      {/* 🧭 Barra de navegación técnica (Simulador de múltiples terminales) */}
+      <nav style={{ 
+        background: '#1e293b', 
+        padding: '15px', 
+        display: 'flex', 
+        gap: '25px', 
+        justifyContent: 'center', 
+        borderBottom: '3px solid #334155',
+        flexWrap: 'wrap'
+      }}>
+        <Link to="/" style={linkStyle}>📱 Vista Kiosko</Link>
+        <Link to="/cocina" style={linkStyle}>👨‍🍳 Monitor Cocina</Link>
+        <Link to="/turnos" style={linkStyle}>📺 Pantalla Turnos</Link>
+        
+        {/* Módulos de Gestión */}
+        <Link to="/caja" style={adminStyle}>💵 Caja / Cobros</Link>
+        <Link to="/AdminDashboard" style={adminStyle}>⚙️ Administración</Link>
       </nav>
 
-      {/* 🚦 Enrutamiento Declarativo de la Aplicación */}
+      {/* 🚦 Enrutador de Componentes */}
       <Routes>
-        {/* Ruta principal: Entorno interactivo del comensal */}
+        {/* Entorno interactivo del comensal */}
         <Route path="/" element={<Kiosko />} />
-        
-        {/* Ruta de producción: Terminal secundaria del cocinero */}
+
+        {/* Terminal secundaria del cocinero */}
         <Route path="/cocina" element={<MonitorCocina />} />
 
-        {/* Terminal de visualización para los clientes */}
+        {/* Pantalla pública de visualización */}
         <Route path="/turnos" element={<PantallaTurnos />} />
 
-        {/* 🌟 NUEVA RUTA: El cajero o administrador */}
+        {/* Terminal del cajero para cobrar y despachar */}
         <Route path="/caja" element={<Caja />} />
+        
+        {/* Panel de control del gerente/administrador */}
+        <Route path="/AdminDashboard" element={<AdminDashboard />} />
       </Routes>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;
