@@ -50,7 +50,7 @@ def estimar_tiempo(carrito: list = Body(...)):
         cursor.execute(query_max_time, (nombres_platos if nombres_platos else [''],))
         tiempo_base = float(cursor.fetchone()['max_time'])
         
-        # 🌟 NUEVA MATEMÁTICA FLUIDA 🌟
+        # Funciones Matemáticas
         
         # 1. Calculamos el tiempo de una tanda completamente llena (ej. 8 platos)
         tiempo_tanda_llena = tiempo_base + (tiempo_base * porc_extra * (capacidad_paila - 1))

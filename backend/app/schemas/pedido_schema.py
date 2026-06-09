@@ -7,8 +7,6 @@ class TipoMod(str, Enum):
     EXTRA = "EXTRA"
     SIN = "SIN"
 
-
-
 class AccionLLM(BaseModel):
     accion: str = Field(description="'AGREGAR' o 'QUITAR'")
     plato: str = Field(description="Nombre exacto del platillo")
@@ -22,13 +20,11 @@ class SalidaLLM(BaseModel):
     numero_mesa: int
     acciones: List[AccionLLM]
 
-# 4. Lo que le enviaremos de regreso a React (El carrito final calculado por Python)
+# Lo que le enviaremos de regreso a React (El carrito final calculado por Python)
 class ModificacionStruct(BaseModel):
     tipo: str = Field(description="Debe ser 'EXTRA', 'SIN', o 'POCO'")
     ingrediente: str = Field(description="Nombre del ingrediente")
     recargo: float = 0.0 # 🌟 NUEVO: Para enviar cuánto costó este extra
-
-
 
 class ItemPedido(BaseModel):
     plato: str
@@ -43,9 +39,7 @@ class OrdenEstructurada(BaseModel):
     numero_mesa: int = 0
     pedidos: List[ItemPedido]
     total_pedido: float = 0.0 
-    error_stock: str = "" # 🌟
-
-# ... (OrdenEntrante e InteraccionBienvenida se quedan igual)
+    error_stock: str = "" 
 
 class OrdenEntrante(BaseModel):
     id_mesa: int

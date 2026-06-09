@@ -19,6 +19,9 @@ export default function AdminReportes() {
     const [datosPlatos, setDatosPlatos] = useState({ labels: [], ingresos: [], cantidades: [] });
     const [datosOperacion, setDatosOperacion] = useState({ labels: [], pedidos: [], tiempos: [] });
 
+    const [datosEvolucion, setDatosEvolucion] = useState({ labels: [], data: [] });
+    const [datosHeatmap, setDatosHeatmap] = useState([]);
+
     // ================= LLAMADA AL BACKEND =================
     useEffect(() => {
         const cargarDatos = async () => {
@@ -43,6 +46,33 @@ export default function AdminReportes() {
         cargarDatos();
     }, [periodo]); // Se vuelve a ejecutar cada vez que cambia "periodo"
 
+
+    // ================= LLAMADA AL BACKEND =================
+    useEffect(() => {
+        const cargarDatos = async () => {
+            try {
+                const resKpis = await fetch(`http://localhost:8000/admin/reportes/kpis?periodo=${periodo}`);
+                if (resKpis.ok) setKpis(await resKpis.json());
+
+                const resPlatos = await fetch(`http://localhost:8000/admin/reportes/platos?periodo=${periodo}`);
+                if (resPlatos.ok) setDatosPlatos(await resPlatos.json());
+
+                const resOperacion = await fetch(`http://localhost:8000/admin/reportes/operacion?periodo=${periodo}`);
+                if (resOperacion.ok) setDatosOperacion(await resOperacion.json());
+
+                // 👇 NUEVAS RUTAS AÑADIDAS 👇
+                const resEvolucion = await fetch(`http://localhost:8000/admin/reportes/evolucion?periodo=${periodo}`);
+                if (resEvolucion.ok) setDatosEvolucion(await resEvolucion.json());
+
+                const resHeatmap = await fetch(`http://localhost:8000/admin/reportes/heatmap`);
+                if (resHeatmap.ok) setDatosHeatmap(await resHeatmap.json());
+
+            } catch (error) {
+                console.error("Error al cargar los reportes:", error);
+            }
+        };
+        cargarDatos();
+    }, [periodo]);
     // ================= ESTILOS =================
     const theme = {
         card: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' },
@@ -83,58 +113,83 @@ export default function AdminReportes() {
     };
 
     // Gráficos Estáticos (Simulados por ahora, ya que requieren consultas más específicas de fechas y combos)
-    const evolucionData = { labels: ['1 May', '6 May', '11 May', '16 May', '21 May', '26 May', '31 May'], datasets: [{ label: 'Ingresos', data: [300, 500, 400, 800, 600, 1100, 950], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 3 }] };
+    const evolucionData = {
+        labels: datosEvolucion.labels.length > 0 ? datosEvolucion.labels : ['Sin datos'],
+        datasets: [{
+            label: 'Ingresos',
+            data: datosEvolucion.data.length > 0 ? datosEvolucion.data : [0],
+            borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 3
+        }]
+    };
     const pagosData = { labels: ['Efectivo', 'Tarjeta', 'Transferencia'], datasets: [{ data: [45, 35, 20], backgroundColor: ['#10b981', '#3b82f6', '#f59e0b'], borderWidth: 0, cutout: '70%' }] };
 
     // Generador de Mapa de Calor Estático (Visual)
     const generarHeatmap = () => {
         const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-        const horas = ['11h', '12h', '13h', '14h', '15h', '16h', '19h', '20h'];
+        const horas = [11, 12, 13, 14, 15, 16, 19, 20];
+        const maxPedidos = datosHeatmap.length > 0 ? Math.max(...datosHeatmap.map(d => d.cantidad_pedidos)) : 1;
+
         return (
             <div style={{ display: 'grid', gridTemplateColumns: 'auto repeat(8, 1fr)', gap: '4px', fontSize: '12px', color: '#64748b' }}>
-                <div></div>{horas.map(h => <div key={h} style={{ textAlign: 'center' }}>{h}</div>)}
-                {dias.map((dia, i) => (
-                    <React.Fragment key={dia}>
-                        <div style={{ alignSelf: 'center', fontWeight: '500' }}>{dia}</div>
-                        {horas.map((hora, j) => {
-                            const intensidad = (i > 4 ? 0.4 : 0) + (j === 2 || j === 3 ? 0.5 : 0.1) + Math.random() * 0.2;
-                            return <div key={`${dia}-${hora}`} style={{ backgroundColor: `rgba(239, 68, 68, ${Math.min(intensidad, 1)})`, height: '25px', borderRadius: '4px' }}></div>;
-                        })}
-                    </React.Fragment>
-                ))}
+                <div></div>{horas.map(h => <div key={h} style={{ textAlign: 'center' }}>{h}h</div>)}
+                {dias.map((dia_nombre, indice_dia) => {
+                    const dia_db = indice_dia + 1; // En SQL, Lunes = 1, Domingo = 7
+
+                    return (
+                        <React.Fragment key={dia_nombre}>
+                            <div style={{ alignSelf: 'center', fontWeight: '500' }}>{dia_nombre}</div>
+                            {horas.map(hora => {
+                                // Buscamos si en la base de datos hay pedidos para este día y hora
+                                const registro = datosHeatmap.find(d => d.dia_semana === dia_db && d.hora === hora);
+                                const pedidos = registro ? registro.cantidad_pedidos : 0;
+
+                                // Calculamos qué tan rojo se pone (0 a 1)
+                                const intensidad = pedidos / maxPedidos;
+                                const bgColor = pedidos > 0 ? `rgba(239, 68, 68, ${Math.max(intensidad, 0.15)})` : '#f8fafc'; // Gris si no hay pedidos
+
+                                return (
+                                    <div key={`${dia_nombre}-${hora}`}
+                                        title={`${dia_nombre} a las ${hora}h: ${pedidos} pedidos`}
+                                        style={{ backgroundColor: bgColor, height: '25px', borderRadius: '4px', transition: '0.3s' }}>
+                                    </div>
+                                );
+                            })}
+                        </React.Fragment>
+                    );
+                })}
             </div>
         );
     };
 
     const llamarIAReal = async () => {
-        setCargandoIA(true);
-        try {
-            // Empaquetamos los datos reales que ya tienes en el estado
-            const payload = {
-                kpis: kpis,
-                platos: datosPlatos,
-                operacion: datosOperacion
-            };
+    setCargandoIA(true);
+    setAnalisisIA(null); // Limpiamos el análisis anterior
 
-            const res = await fetch(`http://localhost:8000/admin/reportes/generar-analisis-ia`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+    try {
+      const response = await fetch('http://localhost:8000/admin/reportes/generar-analisis-ia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kpis: kpis,
+          platos: datosPlatos,
+          operacion: datosOperacion,
+          periodo: periodo // Enviamos si es 'hoy', 'semana' o 'mes'
+        })
+      });
 
-            if (res.ok) {
-                const data = await res.json();
-                setAnalisisIA(data.analisis);
-            } else {
-                setAnalisisIA("Error al procesar los datos con la IA.");
-            }
-        } catch (error) {
-            console.error("Error de conexión:", error);
-            setAnalisisIA("No se pudo conectar con el servicio de Inteligencia Artificial.");
-        } finally {
-            setCargandoIA(false);
-        }
-    };
+      if (response.ok) {
+        const data = await response.json();
+        setAnalisisIA(data.analisis);
+      } else {
+        setAnalisisIA("⚠️ Hubo un error al comunicarse con el oráculo de IA.");
+      }
+    } catch (error) {
+      console.error("Error al llamar a la IA:", error);
+      setAnalisisIA("⚠️ El servidor de Inteligencia Artificial (Ollama) no responde. Asegúrate de que esté encendido.");
+    } finally {
+      setCargandoIA(false);
+    }
+  };
     const getEstiloIconoHallazgo = (tipo) => {
         const estilos = {
             verde: { bg: '#dcfce7', color: '#16a34a' },
@@ -201,7 +256,7 @@ export default function AdminReportes() {
             {subPagina === 'resumen' && (
                 <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                     <div style={{ ...theme.card, flex: 2, minWidth: '400px' }}>
-                        <h3 style={theme.tituloCard}>¿Estamos ganando más o menos dinero? (Evolución Simulada)</h3>
+                        <h3 style={theme.tituloCard}>¿Estamos ganando más o menos dinero?</h3>
                         <div style={{ height: '300px' }}><Line data={evolucionData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }} /></div>
                     </div>
 
@@ -270,7 +325,7 @@ export default function AdminReportes() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                         <div style={{ ...theme.card, flex: 1, minWidth: '350px' }}>
-                            <h3 style={theme.tituloCard}>¿Cuándo se llena más? (Mapa de Calor Simulado)</h3>
+                            <h3 style={theme.tituloCard}>¿Cuándo se llena más? </h3>
                             {generarHeatmap()}
                         </div>
                         <div style={{ ...theme.card, flex: 1, minWidth: '350px' }}>

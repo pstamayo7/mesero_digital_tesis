@@ -10,6 +10,7 @@ class DatosAnalisis(BaseModel):
     kpis: dict
     platos: dict
     operacion: dict
+    periodo: str = "este periodo"
 
 @router.get("/reportes/kpis")
 def obtener_kpis(periodo: str = 'mes', db=Depends(get_db)):
@@ -146,5 +147,87 @@ def obtener_metricas_operacion(periodo: str = 'mes', db=Depends(get_db)):
         return {"error": str(e)}
 @router.post("/reportes/generar-analisis-ia")
 def generar_analisis_ia(datos: DatosAnalisis):
-    analisis = generar_analisis_negocio(datos.kpis, datos.platos, datos.operacion)
+    # Asegúrate de importar generar_analisis_negocio arriba: 
+    # from app.services.ia_service import generar_analisis_negocio
+    
+    analisis = generar_analisis_negocio(
+        kpis=datos.kpis, 
+        platos=datos.platos, 
+        operacion=datos.operacion,
+        periodo=datos.periodo
+    )
     return {"analisis": analisis}
+
+@router.get("/reportes/evolucion")
+def obtener_evolucion_ventas(periodo: str = 'semana', db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    
+    # 1. Filtro y agrupación dinámica según el periodo
+    if periodo == 'hoy':
+        filtro_fecha = "DATE(fecha_apertura) = CURRENT_DATE"
+        agrupacion = "EXTRACT(HOUR FROM fecha_apertura)"
+    elif periodo == 'semana':
+        filtro_fecha = "fecha_apertura >= date_trunc('week', CURRENT_DATE)"
+        agrupacion = "EXTRACT(ISODOW FROM fecha_apertura)"
+    else: # mes
+        filtro_fecha = "fecha_apertura >= date_trunc('month', CURRENT_DATE)"
+        # agrupamos por el DÍA del mes (1 al 31)
+        agrupacion = "EXTRACT(DAY FROM fecha_apertura)"
+
+    query = f"""
+        SELECT 
+            {agrupacion} AS bloque_tiempo,
+            COALESCE(SUM(total_final), 0) AS ingresos
+        FROM pedido
+        WHERE {filtro_fecha} AND estado_pago = 'PAGADO'
+        GROUP BY bloque_tiempo
+        ORDER BY bloque_tiempo
+    """
+    
+    try:
+        cursor.execute(query)
+        resultados = cursor.fetchall()
+        
+        labels = []
+        data = []
+        dias_semana = {1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb', 7: 'Dom'}
+        
+        for r in resultados:
+            bloque = int(r['bloque_tiempo'])
+            if periodo == 'hoy':
+                labels.append(f"{bloque}h00")
+            elif periodo == 'semana':
+                labels.append(dias_semana.get(bloque, str(bloque)))
+            else:
+                # 👇 CAMBIO AQUÍ: Ahora la etiqueta dirá "Día 1", "Día 15", etc.
+                labels.append(f"Día {bloque}")
+                
+            data.append(float(r['ingresos']))
+            
+        return {"labels": labels, "data": data}
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.get("/reportes/heatmap")
+def obtener_heatmap_operacion(db=Depends(get_db)):
+    # El Heatmap casi siempre analiza datos históricos grandes (ej. el último mes)
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    
+    query = """
+        SELECT 
+            EXTRACT(ISODOW FROM fecha_apertura) AS dia_semana,
+            EXTRACT(HOUR FROM fecha_apertura) AS hora,
+            COUNT(id_pedido) AS cantidad_pedidos
+        FROM pedido
+        WHERE fecha_apertura >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY dia_semana, hora
+    """
+    
+    try:
+        cursor.execute(query)
+        resultados = cursor.fetchall()
+        
+        # Devolveremos los datos crudos, el frontend se encargará de pintarlos
+        return resultados
+    except Exception as e:
+        return {"error": str(e)}

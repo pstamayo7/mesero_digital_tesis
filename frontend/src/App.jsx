@@ -24,26 +24,24 @@ function App() {
 
   return (
     <Router>
-      {/* 🧭 Barra de navegación técnica (Simulador de múltiples terminales) */}
-      <nav style={{ 
-        background: '#1e293b', 
-        padding: '15px', 
-        display: 'flex', 
-        gap: '25px', 
-        justifyContent: 'center', 
+      {/* Barra de navegación técnica (Simulador de múltiples terminales) */}
+      <nav style={{
+        background: '#1e293b',
+        padding: '15px',
+        display: 'flex',
+        gap: '25px',
+        justifyContent: 'center',
         borderBottom: '3px solid #334155',
         flexWrap: 'wrap'
       }}>
         <Link to="/" style={linkStyle}>📱 Vista Kiosko</Link>
         <Link to="/cocina" style={linkStyle}>👨‍🍳 Monitor Cocina</Link>
         <Link to="/turnos" style={linkStyle}>📺 Pantalla Turnos</Link>
-        
-        {/* Módulos de Gestión */}
         <Link to="/caja" style={adminStyle}>💵 Caja / Cobros</Link>
         <Link to="/AdminDashboard" style={adminStyle}>⚙️ Administración</Link>
       </nav>
 
-      {/* 🚦 Enrutador de Componentes */}
+      {/* Enrutador de Componentes */}
       <Routes>
         {/* Entorno interactivo del comensal */}
         <Route path="/" element={<Kiosko />} />
@@ -56,7 +54,7 @@ function App() {
 
         {/* Terminal del cajero para cobrar y despachar */}
         <Route path="/caja" element={<Caja />} />
-        
+
         {/* Panel de control del gerente/administrador */}
         <Route path="/AdminDashboard" element={<AdminDashboard />} />
       </Routes>
