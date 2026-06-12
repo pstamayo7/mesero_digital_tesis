@@ -81,7 +81,7 @@ function Kiosko() {
             setErrorStock(`Stock insuficiente de ${data.ingrediente}. Quedan ${data.stock} en bodega.`);
           } else {
             // Si el backend dice que todo está bien (ej. le dio al botón '-'), limpiamos el error
-            setErrorStock(""); 
+            setErrorStock("");
           }
         })
         .catch(err => console.error("Error validando stock:", err));
@@ -92,14 +92,14 @@ function Kiosko() {
     }
   }, [carrito]);
 
- // =====================================================================
+  // =====================================================================
   // CARRITO TÁCTIL (AHORA CON COSTEO MATEMÁTICO)
   // =====================================================================
   const agregarAlCarrito = (platoNombre) => {
-   
+
     setCarrito(prev => {
       const index = prev.findIndex(item => item.plato === platoNombre && !item.modificaciones);
-      
+
       // Buscamos el precio base del plato en el estado 'menu'
       let precioBase = 0;
       menu.forEach(categoria => {
@@ -117,10 +117,10 @@ function Kiosko() {
         };
         return nuevoCarrito;
       }
-      
-      return [...prev, { 
-        plato: platoNombre, 
-        cantidad: 1, 
+
+      return [...prev, {
+        plato: platoNombre,
+        cantidad: 1,
         modificaciones: "",
         mods_estructuradas: [],
         precio_unitario: precioBase,
@@ -276,7 +276,7 @@ function Kiosko() {
           if (respuesta.ok) {
             const resultado = await respuesta.json();
             if (resultado.transcripcion) setTranscripcion(resultado.transcripcion);
-            
+
             if (resultado.orden) {
               // 🌟 NUEVO: Buscamos el error dentro de la orden
               if (resultado.orden.error_stock) {
@@ -468,7 +468,7 @@ function Kiosko() {
               <li key={index} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #ccc', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  
+
                   {/* NOMBRE Y PRECIO UNITARIO */}
                   <div style={{ flex: 2 }}>
                     <strong style={{ fontSize: '1.2rem', display: 'block' }}>{item.plato}</strong>
@@ -570,6 +570,11 @@ function Kiosko() {
               <div className="platos-grid">
                 {categoria.platos.map((plato) => (
                   <div key={plato.id_plato} className="tarjeta-plato">
+                    <img
+                      src={`http://127.0.0.1:8000${plato.ruta_imagen || '/imagenes/default.png'}`}
+                      alt={plato.nombre}
+                      style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px 8px 0 0', marginBottom: '10px' }}
+                    />
                     <h3>{plato.nombre}</h3>
                     <p>{plato.descripcion}</p>
                     <div className="plato-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>

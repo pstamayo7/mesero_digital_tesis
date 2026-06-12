@@ -19,6 +19,9 @@ export default function AdminDashboard() {
   
   const [mostrarFormIngrediente, setMostrarFormIngrediente] = useState(false);
   const [nuevoIngNombre, setNuevoIngNombre] = useState('');
+  
+  // Estado para la pestaña de Fotos
+  const [platosGestion, setPlatosGestion] = useState([]);
 
   useEffect(() => {
     cargarConfiguracion();
@@ -96,6 +99,42 @@ export default function AdminDashboard() {
     abrirReceta(modalReceta.plato);
   };
 
+  // ================= GESTIÓN DE FOTOS =================
+  const cargarPlatosGestion = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/admin/platos/todos');
+      if (res.ok) {
+        const data = await res.json();
+        setPlatosGestion(data.platos);
+      }
+    } catch (error) { console.error("Error cargando platos", error); }
+  };
+
+  // Corregido: Ahora escucha a `tabActiva`, no a `subPagina`
+  useEffect(() => {
+    if (tabActiva === 'fotos') cargarPlatosGestion();
+  }, [tabActiva]);
+
+  const subirImagen = async (id_plato, event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("imagen", file);
+    
+    try {
+      const res = await fetch(`http://localhost:8000/admin/platos/${id_plato}/imagen`, {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        mostrarMensaje("✅ ¡Imagen actualizada con éxito!");
+        cargarPlatosGestion(); // Recargamos para ver la nueva foto
+      }
+    } catch (error) {
+      alert("Error al subir la imagen");
+    }
+  };
+
   // ================= FUNCIONES DE CREACIÓN ELEGANTE =================
   const confirmarNuevoPlato = () => {
     if (nuevoPlatoNombre.trim() !== '') {
@@ -138,6 +177,7 @@ export default function AdminDashboard() {
         {[
           { id: 'reportes', icono: '📊', texto: 'Reportes & IA' },
           { id: 'platos', icono: '🍔', texto: 'Menú & Recetas' },
+          { id: 'fotos', icono: '📸', texto: 'Fotos del Menú' }, // 👈 NUEVA PESTAÑA AQUÍ
           { id: 'ingredientes', icono: '📦', texto: 'Inventario' },
           { id: 'configuracion', icono: '🎛️', texto: 'Configuración' }
         ].map(item => (
@@ -163,7 +203,7 @@ export default function AdminDashboard() {
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h1 style={{ color: '#0f172a', margin: 0, textTransform: 'capitalize' }}>
-          {tabActiva === 'reportes' ? 'Análisis de Datos' : tabActiva === 'platos' ? 'Gestión de Menú' : tabActiva === 'ingredientes' ? 'Control de Stock' : 'Configuración'}
+          {tabActiva === 'reportes' ? 'Análisis de Datos' : tabActiva === 'platos' ? 'Gestión de Menú' : tabActiva === 'fotos' ? 'Fotografías del Menú' : tabActiva === 'ingredientes' ? 'Control de Stock' : 'Configuración'}
         </h1>
         {mensaje && <div style={{ backgroundColor: '#10b981', color: 'white', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', animation: 'fadeIn 0.5s' }}>{mensaje}</div>}
       </div>
@@ -213,6 +253,37 @@ export default function AdminDashboard() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ================= PESTAÑA NUEVA: FOTOS DEL MENÚ ================= */}
+      {tabActiva === 'fotos' && (
+        <div style={{ ...theme.card }}>
+          <h2 style={{ margin: '0 0 20px 0', color: '#334155' }}>Fotografías para el Kiosko</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
+            {platosGestion.map(plato => (
+              <div key={plato.id_plato} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '15px', textAlign: 'center', backgroundColor: '#f8fafc' }}>
+               <img 
+  src={`http://127.0.0.1:8000${plato.ruta_imagen}`} 
+  alt={plato.nombre}
+  onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/250x150?text=Sin+Foto'; }}
+  style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '6px', marginBottom: '10px' }}
+/>
+                <h4 style={{ margin: '0 0 5px 0', color: '#1e293b' }}>{plato.nombre}</h4>
+                <span style={{ color: '#10b981', fontWeight: 'bold', display: 'block', marginBottom: '15px' }}>${parseFloat(plato.precio_base).toFixed(2)}</span>
+                
+                <label style={{ cursor: 'pointer', backgroundColor: '#3b82f6', color: 'white', padding: '8px 15px', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', display: 'inline-block' }}>
+                  📸 Subir Nueva Foto
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    style={{ display: 'none' }} 
+                    onChange={(e) => subirImagen(plato.id_plato, e)} 
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       

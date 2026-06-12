@@ -3,6 +3,10 @@ from pydantic import BaseModel
 from typing import List, Optional
 from psycopg2.extras import RealDictCursor
 from app.core.database import get_db
+from fastapi import APIRouter, UploadFile, File, Depends, Form
+import shutil
+import os
+from app.core.database import get_db
 
 router = APIRouter(prefix="/admin", tags=["Administración"])
 
@@ -36,6 +40,7 @@ class RecetaItem(BaseModel):
 # ==========================================
 # RUTAS DE CONFIGURACIÓN
 # ==========================================
+
 @router.get("/configuracion")
 def obtener_configuracion(db=Depends(get_db)):
     cursor = db.cursor(cursor_factory=RealDictCursor) 
@@ -81,6 +86,7 @@ def editar_ingrediente(id_ingrediente: int, ing: IngredienteBase, db=Depends(get
     db.commit()
     return {"mensaje": "Ingrediente actualizado"}
 
+
 # ==========================================
 # RUTAS DE MENÚ (PLATOS)
 # ==========================================
@@ -106,6 +112,44 @@ def editar_plato(id_plato: int, plato: PlatoBase, db=Depends(get_db)):
                    (plato.nombre, plato.precio_base, plato.requiere_coccion, plato.tiempo_prep_min, id_plato))
     db.commit()
     return {"mensaje": "Plato actualizado"}
+
+
+@router.get("/platos/todos")
+async def obtener_todos_los_platos(db = Depends(get_db)):
+    cursor = db.cursor()
+    cursor.execute("SELECT id_plato, nombre, precio_base, ruta_imagen FROM plato ORDER BY id_plato")
+    filas = cursor.fetchall()
+    
+    # 🌟 CORRECCIÓN: Convertimos las tuplas crudas a diccionarios que React pueda entender
+    platos_formateados = []
+    for fila in filas:
+        platos_formateados.append({
+            "id_plato": fila[0],
+            "nombre": fila[1],
+            "precio_base": fila[2],
+            "ruta_imagen": fila[3]
+        })
+        
+    return {"platos": platos_formateados}
+
+@router.post("/platos/{id_plato}/imagen")
+async def subir_imagen_plato(id_plato: int, imagen: UploadFile = File(...), db = Depends(get_db)):
+    # 1. Definimos dónde se va a guardar
+    extension = imagen.filename.split(".")[-1]
+    nombre_archivo = f"plato_{id_plato}.{extension}"
+    ruta_fisica = f"app/static/imagenes/{nombre_archivo}"
+    
+    # 2. Guardamos el archivo en el disco duro
+    with open(ruta_fisica, "wb") as buffer:
+        shutil.copyfileobj(imagen.file, buffer)
+        
+    # 3. Actualizamos la base de datos con la ruta pública
+    ruta_publica = f"/imagenes/{nombre_archivo}"
+    cursor = db.cursor()
+    cursor.execute("UPDATE plato SET ruta_imagen = %s WHERE id_plato = %s", (ruta_publica, id_plato))
+    db.commit()
+    
+    return {"mensaje": "Imagen subida con éxito", "ruta_imagen": ruta_publica}
 
 # ==========================================
 # RUTAS DE RECETAS (¡NUEVO!)

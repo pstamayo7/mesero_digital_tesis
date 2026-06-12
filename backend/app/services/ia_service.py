@@ -174,7 +174,7 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
     # FASE A: ESCUCHAR
     print("🧠 1/3 Transcribiendo audio de pedido...")
     
-    glosario_zita = "Fritada, llapingachos, mote, tostado, maduro, chicharrón, empanadas, yahuarlocro, menú, porción, pedido, colas."
+    glosario_zita = "Fritada, llapingachos, mote, tostado, maduro, chicharrón, chorizo, combo, bandeja, chicha, menú, porción, pedido, colas."
     segmentos, info = modelo_whisper.transcribe(
         ruta_temporal_audio, beam_size=5, language="es", initial_prompt=glosario_zita
     )
@@ -214,7 +214,7 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
 
     2. MATEMÁTICA DE SUBDIVISIÓN (Pedidos Nuevos):
        - Si pide "N" platos en total, pero "M" tienen cambios, RESTA (N - M).
-       - Ejemplo: "3 fritadas, 1 sin mote" -> AGREGAR 2 normales ([]), AGREGAR 1 modificada ([{{"tipo": "SIN", "ingrediente": "Mote"}}]).
+       - Ejemplo: "3 combos 1, 1 sin mote" -> AGREGAR 2 normales ([]), AGREGAR 1 modificada ([{{"tipo": "SIN", "ingrediente": "Mote"}}]).
 
    3. ⚠️ INTERCAMBIO vs REPETICIÓN (¡DIFERENCIA VITAL!):
        - REPETICIÓN (CLONAR): Si el cliente quiere OTRO plato IGUAL (ej. "agrega otra igual", "otra con los mismos extras"), NO QUITES NADA. Solo usa AGREGAR y copia las modificaciones del carrito.

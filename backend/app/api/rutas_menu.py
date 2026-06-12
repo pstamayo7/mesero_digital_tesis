@@ -16,9 +16,10 @@ def obtener_menu():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        # 🌟 CORRECCIÓN 1: Agregamos p.ruta_imagen al SELECT
         cursor.execute("""
             SELECT c.id_categoria, c.nombre AS categoria_nombre, 
-                   p.id_plato, p.nombre AS plato_nombre, p.precio_base, p.tiempo_prep_min 
+                   p.id_plato, p.nombre AS plato_nombre, p.precio_base, p.tiempo_prep_min, p.ruta_imagen
             FROM Categoria c
             JOIN Plato p ON c.id_categoria = p.id_categoria
         """)
@@ -34,11 +35,13 @@ def obtener_menu():
                     "platos": []
                 }
             
+            # 🌟 CORRECCIÓN 2: Agregamos ruta_imagen al diccionario que se envía a React
             categorias_dict[id_cat]["platos"].append({
                 "id_plato": fila['id_plato'],
                 "nombre": fila['plato_nombre'],
                 "descripcion": f"Tiempo estimado: {fila['tiempo_prep_min']} min",
-                "precio": float(fila['precio_base'])
+                "precio": float(fila['precio_base']),
+                "ruta_imagen": fila['ruta_imagen']
             })
             
         return {"categorias": list(categorias_dict.values())}

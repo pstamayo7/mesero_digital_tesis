@@ -8,8 +8,15 @@ from app.services.ia_service import validar_stock_carrito
 from app.api import rutas_caja
 from app.api import rutas_admin
 from app.api import rutas_reportes
+from fastapi.staticfiles import StaticFiles
+import os
+
+
 
 app = FastAPI(title="API Mesero Digital - Doña Zita")
+
+os.makedirs("app/static/imagenes", exist_ok=True)
+app.mount("/imagenes", StaticFiles(directory="app/static/imagenes"), name="imagenes")
 
 # --- CONFIGURACIÓN CORS ACTUALIZADA ---
 app.add_middleware(
@@ -36,7 +43,7 @@ async def validar_carrito_endpoint(request: Request):
     except Exception as e:
         print(f"Error en endpoint validar-carrito: {e}")
         return {"valido": True} # En caso de error, dejamos pasar
-
+app.mount("/imagenes", StaticFiles(directory="app/static/imagenes"), name="imagenes")
 # --- INCLUSIÓN DE RUTAS ---
 app.include_router(rutas_menu.router, tags=["Menú"])
 app.include_router(rutas_voz.router, tags=["Inteligencia Artificial"])
