@@ -31,6 +31,22 @@ def _respuesta_audio_invalido():
         "acciones": []
     }
 
+def _fusionar_modificaciones(mods_existentes, mods_nuevas):
+    """
+    🌟 MERGE ACUMULATIVO: la acción "MODIFICAR" del LLM solo trae lo que cambió en esta
+    frase (ver REGLA "MODIFICACIONES ACUMULATIVAS" del prompt), no el estado final completo.
+    Aquí se fusiona con lo que el ítem ya tenía en el carrito, en vez de sobreescribirlo.
+
+    Se indexa por ingrediente (no por tipo+ingrediente) para que una modificación nueva
+    sobre el mismo ingrediente (ej. tenía EXTRA Queso y ahora pide SIN Queso) reemplace a
+    la vieja en vez de dejar ambas contradictorias. Si el ingrediente es distinto, se
+    conserva junto a las demás (acumulativo). Mismo tipo+ingrediente repetido = sin duplicar.
+    """
+    fusionadas = {_normalizar(m["ingrediente"]): m for m in mods_existentes}
+    for nueva in mods_nuevas:
+        fusionadas[_normalizar(nueva["ingrediente"])] = nueva
+    return list(fusionadas.values())
+
 def _corregir_confusion_de_entidades(acciones, carrito_list):
     """
     🛡️ GUARDRAIL ANTI-CONFUSIÓN DE ENTIDADES: pedido_schema.py ya marcó con
@@ -321,8 +337,11 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
          - El campo "cantidad" de la acción MODIFICAR es CUÁNTAS unidades de ese plato reciben el cambio:
            * Si el cambio aplica a TODAS las unidades de ese plato en el carrito, usa la cantidad total.
            * Si el cambio aplica solo a ALGUNAS (ej. "de los 3 platos típicos, a 1 ponle mote"), usa solo esa cantidad.
-         - El campo "modificaciones" de la acción MODIFICAR debe llevar el estado FINAL completo de modificaciones
-           que ese plato debe tener (no solo lo nuevo que se agrega).
+         - ⚠️ MODIFICACIONES ACUMULATIVAS: el campo "modificaciones" de la acción MODIFICAR debe llevar
+           SOLAMENTE la modificación NUEVA que el cliente está pidiendo ahora. NO repitas los extras o
+           "sin" que ese plato ya tenía en el carrito: el backend los conserva automáticamente y los fusiona
+           con lo nuevo. Si repites las modificaciones viejas, el backend las trata igual (no se duplican),
+           pero tu trabajo es identificar SOLO lo que cambió en esta frase.
 
     3.1 USO DE "QUITAR": "QUITAR" es SOLO para cancelar/eliminar unidades de un plato del carrito porque el
         cliente ya no las quiere (ej. "mejor quita uno", "cancela la fritada"). NUNCA lo combines con AGREGAR
@@ -369,11 +388,24 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
     Cliente: "El plato típico que tengo, agrégale extra mote"
     JSON:
     {{
-        "razonamiento": "El cliente quiere alterar el único Plato Típico que ya tiene en el carrito. Es un INTERCAMBIO, así que uso una sola acción MODIFICAR con la cantidad total (1) y el estado final de modificaciones.",
+        "razonamiento": "El cliente quiere alterar el único Plato Típico que ya tiene en el carrito. Es un INTERCAMBIO, así que uso una sola acción MODIFICAR con la cantidad total (1) y SOLO la modificación nueva (extra mote).",
         "respuesta_mesero": "¡Listo! Le agregué extra de mote a tu plato típico.",
         "numero_mesa": 0,
         "acciones": [
             {{ "accion": "MODIFICAR", "plato": "Plato Típico", "cantidad": 1, "modificaciones": [{{"tipo": "EXTRA", "ingrediente": "Mote"}}] }}
+        ]
+    }}
+
+    EJEMPLO 3.1 (MODIFICACIONES ACUMULATIVAS: el plato ya tenía un extra distinto):
+    Carrito actual: 1 "Plato Típico" con modificaciones [{{"tipo": "EXTRA", "ingrediente": "Queso"}}].
+    Cliente: "A mi plato típico, ponle también sin cebolla"
+    JSON:
+    {{
+        "razonamiento": "El Plato Típico ya tiene EXTRA Queso en el carrito. El cliente solo pide agregar SIN Cebolla. NO repito el extra queso: mando únicamente la modificación nueva, el backend la fusiona con la que ya existía.",
+        "respuesta_mesero": "¡Listo! Tu plato típico ahora también va sin cebolla.",
+        "numero_mesa": 0,
+        "acciones": [
+            {{ "accion": "MODIFICAR", "plato": "Plato Típico", "cantidad": 1, "modificaciones": [{{"tipo": "SIN", "ingrediente": "Cebolla"}}] }}
         ]
     }}
 
@@ -520,32 +552,42 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
                 if item_encontrado is not None:
                     cantidad_actual = item_encontrado.get("cantidad", 0)
 
+                    # 🌟 MERGE ACUMULATIVO: mods_dump trae SOLO lo nuevo (ver prompt). Lo
+                    # fusionamos con lo que el ítem ya tenía para no perder modificaciones
+                    # previas (ej. tenía EXTRA Queso y ahora se agrega SIN Cebolla -> conserva ambas).
+                    mods_fusionadas = _fusionar_modificaciones(
+                        item_encontrado.get("mods_estructuradas", []), mods_dump
+                    )
+                    mods_fusionadas = sorted(mods_fusionadas, key=lambda x: f"{x['tipo']} {x['ingrediente']}")
+                    mods_str_fusionado = ", ".join(f"{m['tipo']} {m['ingrediente']}" for m in mods_fusionadas)
+
                     if accion.cantidad < cantidad_actual:
                         # CASO A (Split): solo una parte de las unidades cambia.
-                        # Le restamos la cantidad al ítem original...
+                        # Le restamos la cantidad al ítem original (que CONSERVA sus
+                        # modificaciones previas intactas, sin fusionar)...
                         item_encontrado["cantidad"] = cantidad_actual - accion.cantidad
 
                         # ...y clonamos un ítem nuevo con su propio cart_item_id, la
-                        # cantidad modificada y las nuevas modificaciones inyectadas.
+                        # cantidad modificada y las modificaciones YA FUSIONADAS.
                         nuevo_item = copy.deepcopy(item_encontrado)
                         nuevo_item["cart_item_id"] = str(uuid.uuid4())
                         nuevo_item["cantidad"] = accion.cantidad
-                        nuevo_item["modificaciones"] = mods_str
-                        nuevo_item["mods_estructuradas"] = mods_dump
+                        nuevo_item["modificaciones"] = mods_str_fusionado
+                        nuevo_item["mods_estructuradas"] = mods_fusionadas
                         carrito_list.append(nuevo_item)
 
                     elif accion.cantidad == cantidad_actual:
                         # CASO B (Full Update): TODAS las unidades del ítem cambian.
-                        # No se crea nada nuevo, se inyectan las modificaciones directo.
-                        item_encontrado["modificaciones"] = mods_str
-                        item_encontrado["mods_estructuradas"] = mods_dump
+                        # No se crea nada nuevo, se inyectan las modificaciones fusionadas.
+                        item_encontrado["modificaciones"] = mods_str_fusionado
+                        item_encontrado["mods_estructuradas"] = mods_fusionadas
 
                     else:
                         # No contemplado por el algoritmo (el LLM pidió modificar más
                         # unidades de las que existen). Para no corromper el carrito,
                         # lo tratamos como Full Update sobre lo que sí existe.
-                        item_encontrado["modificaciones"] = mods_str
-                        item_encontrado["mods_estructuradas"] = mods_dump
+                        item_encontrado["modificaciones"] = mods_str_fusionado
+                        item_encontrado["mods_estructuradas"] = mods_fusionadas
                 # Si no se encontró el plato en el carrito, no hay nada que modificar.
                 continue  # El precio se recalcula más abajo para TODO carrito_list.
 
