@@ -446,6 +446,18 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
         intenciones = SalidaLLM.model_validate(datos_diccionario, context=contexto_entidades)
         # 🛡️ FIN DEL BLINDAJE 🛡️
 
+        # 🛡️ CANONIZACIÓN DE NOMBRE DE PLATO: el LLM puede devolver "fritada tradicional"
+        # o "Fritada Tradicional " en vez del nombre EXACTO de la columna Plato.nombre.
+        # /estimar-tiempo compara con IGUALDAD ESTRICTA (nombre = ANY(%s)), así que un
+        # plato agregado por voz con casing/espacios distintos nunca hace match ahí y el
+        # tiempo estimado se queda pegado. Reescribimos accion.plato con el nombre oficial
+        # de la BD cuando hay coincidencia (igual que ya se hace con los ingredientes).
+        mapa_platos_oficial = {_normalizar(p): p for p in menu_real}
+        for accion in intenciones.acciones:
+            nombre_oficial = mapa_platos_oficial.get(_normalizar(accion.plato))
+            if nombre_oficial:
+                accion.plato = nombre_oficial
+
         # Lectura segura del carrito (Anti-crash React)
         try:
             estado_previo = json.loads(carrito_actual)
