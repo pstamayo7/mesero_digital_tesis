@@ -292,10 +292,10 @@ function Kiosko() {
               }
 
               if (resultado.orden.pedidos) {
+                // El useEffect de [carrito] ya reacciona a este setCarrito y llama a
+                // recalcularMetricasCarrito con el array actualizado: no duplicar la llamada
+                // aquí para evitar peticiones dobles/condiciones de carrera.
                 setCarrito(resultado.orden.pedidos);
-                // 🌟 TAREA 4: recalculamos tiempo de cocina + stock de inmediato con el
-                // array nuevo, sin esperar al ciclo de render+efecto.
-                recalcularMetricasCarrito(resultado.orden.pedidos);
               }
               if (resultado.orden.numero_mesa !== undefined && resultado.orden.numero_mesa !== 0) {
                 setNumeroMesa(resultado.orden.numero_mesa);
