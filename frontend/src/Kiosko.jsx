@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import ModalEdicionPlato from './ModalEdicionPlato.jsx'
 
 function Kiosko() {
   const [pasoActual, setPasoActual] = useState(0);
@@ -23,12 +24,21 @@ function Kiosko() {
   const [numeroMesa, setNumeroMesa] = useState(0)
   const [limitePlatos, setLimitePlatos] = useState(15);
   const [errorStock, setErrorStock] = useState(""); //
+  const [extrasDisponibles, setExtrasDisponibles] = useState([]);
+  const [itemEditando, setItemEditando] = useState(null); // { index, idPlato, precioBase } | null
 
   useEffect(() => {
     fetch('http://127.0.0.1:8000/configuracion-kiosko')
       .then(res => res.json())
       .then(data => setLimitePlatos(data.max_platos))
       .catch(err => console.error("Usando límite por defecto", err));
+  }, []);
+
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/extras-disponibles')
+      .then(res => res.json())
+      .then(data => setExtrasDisponibles(data.extras || []))
+      .catch(err => console.error("Error cargando extras disponibles", err));
   }, []);
 
   useEffect(() => {
@@ -159,6 +169,30 @@ function Kiosko() {
       }
       return nuevoCarrito;
     });
+  };
+
+  const eliminarDelCarrito = (index) => {
+    setErrorStock("");
+    setCarrito(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // 🌟 Abre el modal de edición táctil. Buscamos los metadatos del plato (id_plato,
+  // precio base) en 'menu' en vez de guardarlos en el ítem del carrito: así un plato
+  // agregado por voz (que no trae id_plato) también se puede editar por tacto.
+  const abrirModalEdicion = (index) => {
+    const item = carrito[index];
+    const platoMeta = menu.flatMap(categoria => categoria.platos).find(p => p.nombre === item.plato);
+    if (!platoMeta) return; // ej. "Porción de X": no tiene receta base que editar
+    setItemEditando({ index, idPlato: platoMeta.id_plato, precioBase: platoMeta.precio });
+  };
+
+  const guardarEdicionPlato = (itemActualizado) => {
+    setCarrito(prev => {
+      const nuevoCarrito = [...prev];
+      nuevoCarrito[itemEditando.index] = itemActualizado;
+      return nuevoCarrito;
+    });
+    setItemEditando(null);
   };
 
   // =====================================================================
@@ -502,7 +536,7 @@ function Kiosko() {
                     <strong style={{ fontSize: '1.3rem', color: '#059669', marginRight: '10px' }}>
                       ${(item.subtotal || 0).toFixed(2)}
                     </strong>
-                    <button onClick={() => editarNota(index)} style={{ padding: '8px 12px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>📝</button>
+                    <button onClick={() => abrirModalEdicion(index)} style={{ padding: '8px 12px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>📝</button>
                     <button onClick={() => eliminarDelCarrito(index)} style={{ padding: '8px 12px', backgroundColor: '#6b7280', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>🗑️</button>
                   </div>
                 </div>
@@ -606,6 +640,17 @@ function Kiosko() {
             </div>
           ))}
         </div>
+      )}
+
+      {itemEditando && (
+        <ModalEdicionPlato
+          item={carrito[itemEditando.index]}
+          idPlato={itemEditando.idPlato}
+          precioBase={itemEditando.precioBase}
+          extrasDisponibles={extrasDisponibles}
+          onGuardar={guardarEdicionPlato}
+          onCerrar={() => setItemEditando(null)}
+        />
       )}
     </div>
   )
