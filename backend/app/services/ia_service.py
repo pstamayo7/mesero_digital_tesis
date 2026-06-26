@@ -3,6 +3,8 @@ import ollama
 import json
 import pyttsx3
 import os
+import uuid
+import copy
 from app.core.database import get_db_connection
 from faster_whisper import WhisperModel
 from app.schemas.pedido_schema import SalidaLLM, OrdenEstructurada, ItemPedido, ModificacionStruct,InteraccionBienvenida
@@ -13,6 +15,66 @@ print("✅ Oído de IA listo.")
 def _normalizar(texto: str) -> str:
     """Punto único de normalización para cruzar nombres LLM <-> BD: sin espacios fantasma ni distinción de mayúsculas."""
     return (texto or "").strip().lower()
+
+# 🚫 TAREA 1: Subcadenas de alucinaciones típicas de Whisper en silencios/ruido de fondo
+# (subtítulos de YouTube, anuncios de Amara.org, etc.). Case-insensitive.
+FRASES_ALUCINACION_WHISPER = ["amara", "suscribe", "suscríbete", "subtítulo", "gracias por ver"]
+
+def _respuesta_audio_invalido():
+    """JSON exacto que se devuelve cuando el audio es ruido/silencio o Whisper colapsó.
+    No llamamos a Ollama en este caso: no hay texto válido que razonar."""
+    return {
+        "audio_invalido": True,
+        "razonamiento": "Audio inválido o ruido.",
+        "respuesta_mesero": "¿Me puedes repetir? No te escuché bien.",
+        "numero_mesa": 0,
+        "acciones": []
+    }
+
+def _corregir_confusion_de_entidades(acciones, carrito_list):
+    """
+    🛡️ GUARDRAIL ANTI-CONFUSIÓN DE ENTIDADES: pedido_schema.py ya marcó con
+    es_ingrediente_disfrazado=True cualquier acción donde el LLM puso un ingrediente/extra
+    conocido (ej. "Fritada", "Mote") en el campo 'plato'. Aquí esas acciones se reconvierten
+    en una modificación EXTRA del plato al que en realidad pertenecen, en vez de dejarlas
+    crear un "plato" fantasma que termina cobrando $0.00.
+
+    Prioridad para encontrar el plato dueño del extra:
+    1. El último plato real agregado en esta misma respuesta del LLM.
+    2. El último plato ya existente en el carrito (caso "ponle mote" sin mencionar plato).
+    3. Si no hay ningún plato al que anclarlo, se trata como porción suelta para que
+       al menos cobre el precio correcto del ingrediente.
+    """
+    acciones_corregidas = []
+    ultimo_plato_real = None
+
+    for accion in acciones:
+        if not accion.es_ingrediente_disfrazado:
+            if accion.accion.upper() == "AGREGAR" and accion.plato:
+                ultimo_plato_real = accion
+            acciones_corregidas.append(accion)
+            continue
+
+        extra = ModificacionStruct(tipo="EXTRA", ingrediente=accion.plato)
+
+        if ultimo_plato_real is not None:
+            if ultimo_plato_real.modificaciones is None:
+                ultimo_plato_real.modificaciones = []
+            ultimo_plato_real.modificaciones.append(extra)
+        elif carrito_list:
+            item_carrito = carrito_list[-1]
+            mods_existentes = item_carrito.setdefault("mods_estructuradas", [])
+            mods_existentes.append(extra.model_dump())
+            # Mantenemos el string visual ("modificaciones") en sincronía con
+            # mods_estructuradas para que el frontend no muestre un texto desactualizado.
+            item_carrito["modificaciones"] = ", ".join(
+                f"{m['tipo'].upper()} {m['ingrediente']}" for m in sorted(mods_existentes, key=lambda x: f"{x['tipo']} {x['ingrediente']}")
+            )
+        else:
+            accion.plato = f"Porción de {accion.plato}"
+            acciones_corregidas.append(accion)
+
+    return acciones_corregidas
 
 def obtener_menu_disponible():
     try:
@@ -179,33 +241,64 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
     print("🧠 1/3 Transcribiendo audio de pedido...")
     
     glosario_zita = "Fritada, llapingachos, mote, tostado, maduro, chicharrón, chorizo, combo, bandeja, chicha, menú, porción, pedido, colas."
-    segmentos, info = modelo_whisper.transcribe(
-        ruta_temporal_audio, beam_size=5, language="es", initial_prompt=glosario_zita
-    )
-    texto_completo = " ".join([segmento.text for segmento in segmentos]).strip()
+
+    # 🛡️ TAREA 1: Whisper puede colapsar (EOFError/RuntimeError) con audios vacíos o
+    # corruptos. Si eso pasa, abortamos ANTES de llamar a Ollama: no hay texto que razonar.
+    try:
+        segmentos, info = modelo_whisper.transcribe(
+            ruta_temporal_audio, beam_size=5, language="es", initial_prompt=glosario_zita
+        )
+        texto_completo = " ".join([segmento.text for segmento in segmentos]).strip()
+    except Exception as e:
+        print(f"⚠️ Whisper colapsó transcribiendo el audio: {e}")
+        return _respuesta_audio_invalido()
+
     print(f"🗣️ CLIENTE: '{texto_completo}'")
-    
+
+    # 🚫 Filtro anti-alucinaciones: Whisper a veces "escucha" subtítulos de YouTube o
+    # publicidad en el silencio/ruido de fondo. Si detectamos esas frases típicas,
+    # tampoco llamamos a Ollama con basura.
+    texto_low = texto_completo.lower()
+    if any(frase in texto_low for frase in FRASES_ALUCINACION_WHISPER):
+        print(f"🚫 Alucinación de Whisper detectada en: '{texto_completo}'")
+        return _respuesta_audio_invalido()
+
     # FASE B: RAZONAR INTENCIONES
     print("🤖 2/3 Analizando intención...")
     menu_real = obtener_menu_disponible()
     menu_formateado = "\n".join([f'- "{plato}"' for plato in menu_real])
-    
+
     ingredientes_reales = obtener_ingredientes_disponibles()
     ingredientes_formateados = ", ".join(ingredientes_reales)
-    
+
     limite_maximo = obtener_limite_platos()
-    
+
     prompt_sistema = f"""
     Eres el mesero digital del restaurante 'Fritadas Doña Zita'.
-    
-    📋 MENÚ DISPONIBLE:
+
+    Existen DOS catálogos de entidades, TOTALMENTE SEPARADOS. No los mezcles nunca.
+
+    📋 [LISTA DE PLATOS PRINCIPALES] (esto es lo ÚNICO que puede ir en el campo "plato"):
     {menu_formateado}
-    
-    🍅 INGREDIENTES:
+
+    🍅 [LISTA DE INGREDIENTES/EXTRAS] (esto NUNCA va en el campo "plato", solo dentro de "modificaciones"):
     {ingredientes_formateados}
-    
+
     🛒 ESTADO ACTUAL DEL CARRITO:
     {carrito_actual}
+
+    🚨 REGLAS DE ENTIDADES (PRIORIDAD MÁXIMA, NUNCA LAS ROMPAS):
+
+    A. REGLA DE ENTIDADES: NUNCA, bajo ninguna circunstancia, coloques un ítem de la [LISTA DE INGREDIENTES/EXTRAS]
+       en el campo "plato". El campo "plato" es EXCLUSIVO para nombres de la [LISTA DE PLATOS PRINCIPALES].
+
+    B. REGLA DE EXTRAS: Los ingredientes o extras SIEMPRE deben ir dentro del array "modificaciones" del plato
+       al que pertenecen, como objetos {{"tipo": "EXTRA", "ingrediente": "..."}}. Jamás como un "plato" aparte.
+
+    C. REGLA DE CONTEXTO AISLADO: Si el cliente SOLO pide un extra (ej. "ponle extra mote", "agrégale aguacate")
+       y NO menciona ningún plato nuevo, debes generar una acción de modificación sobre el ÚLTIMO plato
+       mencionado en esta misma frase o el que ya está en el carrito (🛒 ESTADO ACTUAL DEL CARRITO). NO inventes
+       platos nuevos ni uses el nombre del ingrediente como "plato".
 
     🚨 REGLAS CRÍTICAS DE LÓGICA Y FORMATO (¡LEER CON ATENCIÓN!):
 
@@ -222,11 +315,27 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
 
    3. ⚠️ INTERCAMBIO vs REPETICIÓN (¡DIFERENCIA VITAL!):
        - REPETICIÓN (CLONAR): Si el cliente quiere OTRO plato IGUAL (ej. "agrega otra igual", "otra con los mismos extras"), NO QUITES NADA. Solo usa AGREGAR y copia las modificaciones del carrito.
-       - INTERCAMBIO (MODIFICAR): SOLO si el cliente quiere ALTERAR un plato que ya pidió (ej. "a la fritada que ya tengo, quítale el mote"), debes QUITAR el plato viejo y AGREGAR el nuevo modificado.
+       - INTERCAMBIO (MODIFICAR UN PLATO EXISTENTE): Si el cliente quiere ALTERAR un plato que YA ESTÁ en el carrito
+         (ej. "al plato típico que tengo ponle mote", "a la fritada que ya tengo, quítale el mote"), usa UNA SOLA
+         acción con "accion": "MODIFICAR". NUNCA generes QUITAR+AGREGAR para este caso.
+         - El campo "cantidad" de la acción MODIFICAR es CUÁNTAS unidades de ese plato reciben el cambio:
+           * Si el cambio aplica a TODAS las unidades de ese plato en el carrito, usa la cantidad total.
+           * Si el cambio aplica solo a ALGUNAS (ej. "de los 3 platos típicos, a 1 ponle mote"), usa solo esa cantidad.
+         - El campo "modificaciones" de la acción MODIFICAR debe llevar el estado FINAL completo de modificaciones
+           que ese plato debe tener (no solo lo nuevo que se agrega).
+
+    3.1 USO DE "QUITAR": "QUITAR" es SOLO para cancelar/eliminar unidades de un plato del carrito porque el
+        cliente ya no las quiere (ej. "mejor quita uno", "cancela la fritada"). NUNCA lo combines con AGREGAR
+        para simular una modificación: para eso existe "MODIFICAR".
 
     4. ⚠️ PORCIONES SUELTAS (EXTRAS COMO PLATO INDIVIDUAL):
-       - Si el cliente pide un ingrediente de forma independiente (ej. "dame un maduro", "una porción de tostado", "y un mote aparte"), NO lo pongas como modificación de un plato.
-       - Debes AGREGARLO como un plato nuevo, y su nombre debe empezar SIEMPRE con la frase "Porción de " seguido del ingrediente. (Ej. "plato": "Porción de Plátano Maduro").
+       - Esta regla es la ÚNICA excepción a la Regla A, y SOLO aplica si el ingrediente es VERDADERAMENTE
+         lo único que el cliente pidió, sin ningún plato principal en la misma frase
+         (ej. "dame un maduro", "una porción de tostado", "y un mote aparte").
+       - En ese caso (y solo en ese caso) AGRÉGALO como plato nuevo, con nombre que empiece SIEMPRE con
+         "Porción de " seguido del ingrediente (Ej. "plato": "Porción de Plátano Maduro").
+       - Si el ingrediente se pidió JUNTO a un plato principal (ej. "un plato típico con extra de fritada"),
+         NO es una porción suelta: va como "modificaciones" del plato principal (ver Reglas A, B y EJEMPLO 2).
 
     💡 EJEMPLOS DE RAZONAMIENTO Y JSON:
 
@@ -240,6 +349,44 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
         "acciones": [
             {{ "accion": "AGREGAR", "plato": "Fritada Tradicional", "cantidad": 1, "modificaciones": [] }},
             {{ "accion": "AGREGAR", "plato": "Fritada Tradicional", "cantidad": 2, "modificaciones": [{{"tipo": "SIN", "ingrediente": "Mote"}}] }}
+        ]
+    }}
+
+    EJEMPLO 2 (Extra junto a un plato: NO crear un plato nuevo con el nombre del ingrediente):
+    Cliente: "Dame un plato típico con extra de fritada"
+    JSON:
+    {{
+        "razonamiento": "El cliente pide 1 'Plato Típico'. 'Fritada' es un ingrediente de la [LISTA DE INGREDIENTES/EXTRAS], no un plato, así que va como EXTRA dentro de las modificaciones del Plato Típico.",
+        "respuesta_mesero": "¡Listo! Un plato típico con extra de fritada.",
+        "numero_mesa": 0,
+        "acciones": [
+            {{ "accion": "AGREGAR", "plato": "Plato Típico", "cantidad": 1, "modificaciones": [{{"tipo": "EXTRA", "ingrediente": "Fritada"}}] }}
+        ]
+    }}
+
+    EJEMPLO 3 (Intercambio: alterar TODAS las unidades de un plato ya existente en el carrito, con "MODIFICAR"):
+    Carrito actual: 1 "Plato Típico" sin modificaciones.
+    Cliente: "El plato típico que tengo, agrégale extra mote"
+    JSON:
+    {{
+        "razonamiento": "El cliente quiere alterar el único Plato Típico que ya tiene en el carrito. Es un INTERCAMBIO, así que uso una sola acción MODIFICAR con la cantidad total (1) y el estado final de modificaciones.",
+        "respuesta_mesero": "¡Listo! Le agregué extra de mote a tu plato típico.",
+        "numero_mesa": 0,
+        "acciones": [
+            {{ "accion": "MODIFICAR", "plato": "Plato Típico", "cantidad": 1, "modificaciones": [{{"tipo": "EXTRA", "ingrediente": "Mote"}}] }}
+        ]
+    }}
+
+    EJEMPLO 4 (Intercambio: alterar SOLO ALGUNAS unidades -> MODIFICAR divide el plato):
+    Carrito actual: 3 "Plato Típico" sin modificaciones.
+    Cliente: "De los 3 platos típicos, a 1 ponle mote"
+    JSON:
+    {{
+        "razonamiento": "Hay 3 Platos Típicos en el carrito y el cliente solo quiere modificar 1 de ellos. Uso MODIFICAR con cantidad=1: el backend se encarga de separar esa unidad del resto.",
+        "respuesta_mesero": "¡Listo! Uno de tus platos típicos ahora lleva extra mote.",
+        "numero_mesa": 0,
+        "acciones": [
+            {{ "accion": "MODIFICAR", "plato": "Plato Típico", "cantidad": 1, "modificaciones": [{{"tipo": "EXTRA", "ingrediente": "Mote"}}] }}
         ]
     }}
 
@@ -290,7 +437,13 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
                 ]
                 
         # 3. AHORA SÍ, validamos con Pydantic (usamos model_validate en vez de model_validate_json)
-        intenciones = SalidaLLM.model_validate(datos_diccionario)
+        # 🛡️ Le pasamos los catálogos reales por contexto para que el validador de
+        # AccionLLM pueda detectar si el LLM confundió un ingrediente con un plato.
+        contexto_entidades = {
+            "ingredientes_conocidos": {_normalizar(i) for i in ingredientes_reales},
+            "platos_conocidos": {_normalizar(p) for p in menu_real},
+        }
+        intenciones = SalidaLLM.model_validate(datos_diccionario, context=contexto_entidades)
         # 🛡️ FIN DEL BLINDAJE 🛡️
 
         # Lectura segura del carrito (Anti-crash React)
@@ -305,52 +458,111 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
             carrito_list = []
             estado_previo = {}
 
+        # 🛡️ Reconvertimos cualquier ingrediente disfrazado de plato en una modificación
+        # real del plato al que pertenece (ver _corregir_confusion_de_entidades).
+        intenciones.acciones = _corregir_confusion_de_entidades(intenciones.acciones, carrito_list)
+
         numero_mesa_final = intenciones.numero_mesa if intenciones.numero_mesa != 0 else estado_previo.get("numero_mesa", 0)
-        
+
         # 2. MATEMÁTICAS INDESTRUCTIBLES
       # 🌟 TRAEMOS LOS PRECIOS AQUÍ ARRIBA PARA NORMALIZAR LOS NOMBRES ANTES DE AGRUPAR
         precios_platos, precios_extras = obtener_diccionario_precios()
 
         # 2. MATEMÁTICAS INDESTRUCTIBLES
         for accion in intenciones.acciones:
-            mods_lista = accion.modificaciones if accion.modificaciones else []
-            
+            # 🛡️ TAREA 2: ModificacionStruct ya marcó como "INVALIDO" cualquier ingrediente
+            # que el LLM inventó (no existe en el catálogo real). Lo descartamos aquí sin
+            # afectar al resto de las modificaciones ni de la acción.
+            mods_lista = [m for m in (accion.modificaciones or []) if m.ingrediente != "INVALIDO"]
+
             # 🌟 NORMALIZAMOS LOS NOMBRES DE LOS INGREDIENTES
             for m in mods_lista:
                 m.tipo = m.tipo.upper()
                 nombre_ing_low = _normalizar(m.ingrediente)
-                
+
                 # Buscamos su nombre oficial en la base de datos
                 for db_nombre in precios_extras.keys():
                     if nombre_ing_low in db_nombre or db_nombre in nombre_ing_low:
                         # Lo renombramos a su versión limpia (ej. "Mote Cocinado")
                         m.ingrediente = db_nombre.split("(")[0].strip().title()
                         break
-            
+
             # 🌟 ORDENAMOS ALFABÉTICAMENTE PARA QUE EL ORDEN NO IMPORTE 🌟
             mods_lista = sorted(mods_lista, key=lambda x: f"{x.tipo} {x.ingrediente}")
-            
+
             # Ahora sí creamos el string visual uniforme (siempre estará en el mismo orden y con el mismo nombre)
             mods_str = ", ".join([f"{m.tipo} {m.ingrediente}" for m in mods_lista])
-            
+            mods_dump = [m.model_dump() for m in mods_lista]
+
+            # 🌟 TAREA 3: ALGORITMO DE "MODIFICAR" (Split / Full-Update) 🌟
+            # El LLM ya no manda QUITAR+AGREGAR para alterar un plato existente: manda
+            # una sola acción "MODIFICAR". Buscamos el plato desde el final del carrito
+            # hacia atrás (el más reciente que coincide con accion.plato).
+            if accion.accion == "MODIFICAR":
+                item_encontrado = None
+                for item in reversed(carrito_list):
+                    if _normalizar(item.get("plato", "")) == _normalizar(accion.plato):
+                        item_encontrado = item
+                        break
+
+                if item_encontrado is not None:
+                    cantidad_actual = item_encontrado.get("cantidad", 0)
+
+                    if accion.cantidad < cantidad_actual:
+                        # CASO A (Split): solo una parte de las unidades cambia.
+                        # Le restamos la cantidad al ítem original...
+                        item_encontrado["cantidad"] = cantidad_actual - accion.cantidad
+
+                        # ...y clonamos un ítem nuevo con su propio cart_item_id, la
+                        # cantidad modificada y las nuevas modificaciones inyectadas.
+                        nuevo_item = copy.deepcopy(item_encontrado)
+                        nuevo_item["cart_item_id"] = str(uuid.uuid4())
+                        nuevo_item["cantidad"] = accion.cantidad
+                        nuevo_item["modificaciones"] = mods_str
+                        nuevo_item["mods_estructuradas"] = mods_dump
+                        carrito_list.append(nuevo_item)
+
+                    elif accion.cantidad == cantidad_actual:
+                        # CASO B (Full Update): TODAS las unidades del ítem cambian.
+                        # No se crea nada nuevo, se inyectan las modificaciones directo.
+                        item_encontrado["modificaciones"] = mods_str
+                        item_encontrado["mods_estructuradas"] = mods_dump
+
+                    else:
+                        # No contemplado por el algoritmo (el LLM pidió modificar más
+                        # unidades de las que existen). Para no corromper el carrito,
+                        # lo tratamos como Full Update sobre lo que sí existe.
+                        item_encontrado["modificaciones"] = mods_str
+                        item_encontrado["mods_estructuradas"] = mods_dump
+                # Si no se encontró el plato en el carrito, no hay nada que modificar.
+                continue  # El precio se recalcula más abajo para TODO carrito_list.
+
+            # 🌟 Patrón de estado inmutable (Eliminar y Reemplazar): un QUITAR busca el ítem
+            # desde el FINAL del carrito hacia atrás, ya que en un intercambio (QUITAR + AGREGAR)
+            # el ítem que se debe eliminar es el más reciente que coincide, no el más antiguo.
             plato_encontrado = False
-            for item in carrito_list:
-                item_mods = item.get("modificaciones", "")
-                
-                if _normalizar(item.get("plato", "")) == _normalizar(accion.plato) and item_mods == mods_str:
-                    if accion.accion.upper() == "AGREGAR":
-                        item["cantidad"] = item.get("cantidad", 0) + accion.cantidad
-                    elif accion.accion.upper() == "QUITAR":
+            if accion.accion == "QUITAR":
+                for item in reversed(carrito_list):
+                    item_mods = item.get("modificaciones", "")
+                    if _normalizar(item.get("plato", "")) == _normalizar(accion.plato) and item_mods == mods_str:
                         item["cantidad"] = item.get("cantidad", 0) - accion.cantidad
-                    plato_encontrado = True
-                    break
-            
-            if not plato_encontrado and accion.accion.upper() == "AGREGAR":
+                        plato_encontrado = True
+                        break
+            else:  # AGREGAR
+                for item in carrito_list:
+                    item_mods = item.get("modificaciones", "")
+                    if _normalizar(item.get("plato", "")) == _normalizar(accion.plato) and item_mods == mods_str:
+                        item["cantidad"] = item.get("cantidad", 0) + accion.cantidad
+                        plato_encontrado = True
+                        break
+
+            if not plato_encontrado and accion.accion == "AGREGAR":
                 carrito_list.append({
+                    "cart_item_id": str(uuid.uuid4()),
                     "plato": accion.plato,
                     "cantidad": accion.cantidad,
                     "modificaciones": mods_str,
-                    "mods_estructuradas": [m.model_dump() for m in mods_lista]
+                    "mods_estructuradas": mods_dump
                 })
         
         # Filtramos los platos que el cliente canceló
@@ -413,11 +625,28 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
         # Validamos el límite operativo
         total_platos = sum([item.get("cantidad", 0) for item in carrito_list])
         if total_platos > limite_maximo:
+            print(f"🚫 LÍMITE EXCEDIDO: {total_platos}/{limite_maximo} platos")
+
+            # 🛡️ El audio del límite ya NO es un archivo estático precargado (causaba
+            # FileNotFoundError si no existía en disco). Lo generamos al vuelo con el
+            # mismo motor TTS (pyttsx3) que usamos para las respuestas normales.
+            mensaje_limite = (
+                f"Lo siento, el límite máximo es de {limite_maximo} platos por pedido. "
+                "Por favor reduce la cantidad o realiza un segundo pedido aparte."
+            )
+            ruta_audio_limite = "limite_excedido_temp.wav"
+            generar_voz_offline(mensaje_limite, ruta_audio_limite)
+
             return {
                 "exito": True,
                 "transcripcion": texto_completo,
-                "orden": {"pedidos": estado_previo.get("pedidos", []), "numero_mesa": numero_mesa_final, "total_pedido": estado_previo.get("total_pedido", 0.0)},
-                "ruta_audio": "limite_excedido.wav" 
+                "orden": {
+                    "pedidos": estado_previo.get("pedidos", []),
+                    "numero_mesa": numero_mesa_final,
+                    "total_pedido": estado_previo.get("total_pedido", 0.0),
+                    "error_stock": mensaje_limite,
+                },
+                "ruta_audio": ruta_audio_limite
             }
 
         # ... (aquí termina tu validación del límite de los 15 platos) ...

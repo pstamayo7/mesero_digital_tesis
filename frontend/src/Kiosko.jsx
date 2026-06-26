@@ -56,40 +56,48 @@ function Kiosko() {
       })
   }, [])
 
-  useEffect(() => {
-    if (carrito.length > 0) {
-      // 1. Petición original para estimar el tiempo
-      fetch('http://127.0.0.1:8000/estimar-tiempo', {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(carrito)
-      })
-        .then(res => res.json())
-        .then(data => setTiempoEstimado(data.tiempo_estimado_minutos))
-        .catch(err => console.error("Error estimando tiempo:", err));
-
-      // 🌟 2. NUEVA PETICIÓN: Validar stock en tiempo real
-      fetch('http://127.0.0.1:8000/validar-carrito', {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(carrito)
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (!data.valido) {
-            // Si el backend dice que no hay, bloqueamos la pantalla
-            setErrorStock(`Stock insuficiente de ${data.ingrediente}. Quedan ${data.stock} en bodega.`);
-          } else {
-            // Si el backend dice que todo está bien (ej. le dio al botón '-'), limpiamos el error
-            setErrorStock("");
-          }
-        })
-        .catch(err => console.error("Error validando stock:", err));
-
-    } else {
+  // 🌟 TAREA 4: Centralizamos el recálculo de tiempo de cocina + validación de stock en
+  // una sola función, para poder invocarla INMEDIATAMENTE después de un setCarrito por voz
+  // (sin esperar al próximo render/efecto) y también desde el useEffect para los cambios
+  // táctiles del carrito.
+  const recalcularMetricasCarrito = (carritoParaCalcular) => {
+    if (!carritoParaCalcular || carritoParaCalcular.length === 0) {
       setTiempoEstimado(null);
       setErrorStock("");
+      return;
     }
+
+    // 1. Petición original para estimar el tiempo
+    fetch('http://127.0.0.1:8000/estimar-tiempo', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(carritoParaCalcular)
+    })
+      .then(res => res.json())
+      .then(data => setTiempoEstimado(data.tiempo_estimado_minutos))
+      .catch(err => console.error("Error estimando tiempo:", err));
+
+    // 🌟 2. Validar stock en tiempo real
+    fetch('http://127.0.0.1:8000/validar-carrito', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(carritoParaCalcular)
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.valido) {
+          // Si el backend dice que no hay, bloqueamos la pantalla
+          setErrorStock(`Stock insuficiente de ${data.ingrediente}. Quedan ${data.stock} en bodega.`);
+        } else {
+          // Si el backend dice que todo está bien (ej. le dio al botón '-'), limpiamos el error
+          setErrorStock("");
+        }
+      })
+      .catch(err => console.error("Error validando stock:", err));
+  };
+
+  useEffect(() => {
+    recalcularMetricasCarrito(carrito);
   }, [carrito]);
 
   // =====================================================================
@@ -283,7 +291,12 @@ function Kiosko() {
                 setErrorStock(resultado.orden.error_stock);
               }
 
-              if (resultado.orden.pedidos) setCarrito(resultado.orden.pedidos);
+              if (resultado.orden.pedidos) {
+                setCarrito(resultado.orden.pedidos);
+                // 🌟 TAREA 4: recalculamos tiempo de cocina + stock de inmediato con el
+                // array nuevo, sin esperar al ciclo de render+efecto.
+                recalcularMetricasCarrito(resultado.orden.pedidos);
+              }
               if (resultado.orden.numero_mesa !== undefined && resultado.orden.numero_mesa !== 0) {
                 setNumeroMesa(resultado.orden.numero_mesa);
               }
