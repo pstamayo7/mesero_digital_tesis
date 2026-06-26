@@ -1,0 +1,19 @@
+# 📦 Dependencias (¡Súper importante bloquear esto!)
+node_modules/
+venv/
+env/
+__pycache__/
+
+# 🗄️ Base de datos y Orquestación (Para ahorrar tokens)
+n8n/
+docker/
+postgres-data/
+*.sql
+*.sqlite
+
+# ⚙️ Archivos de configuración y compilación
+dist/
+build/
+.vscode/
+.env
+package-lock.json

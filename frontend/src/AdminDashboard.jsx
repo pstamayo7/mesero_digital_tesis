@@ -52,9 +52,11 @@ export default function AdminDashboard() {
   };
 
   const guardarIngrediente = async (ing, esNuevo = false) => {
+    // Saneamos espacios fantasma antes de que lleguen a PostgreSQL (rompen el cruce de nombres con el LLM)
+    const ingSaneado = { ...ing, nombre: ing.nombre.trim() };
     const url = esNuevo ? 'http://localhost:8000/admin/ingredientes' : `http://localhost:8000/admin/ingredientes/${ing.id_ingrediente}`;
     const method = esNuevo ? 'POST' : 'PUT';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ing) });
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ingSaneado) });
     if (res.ok) {
       mostrarMensaje(esNuevo ? "✅ Ingrediente agregado" : "✅ Ingrediente actualizado");
       cargarIngredientes();
@@ -67,9 +69,11 @@ export default function AdminDashboard() {
   };
 
   const guardarPlato = async (plato, esNuevo = false) => {
+    // Saneamos espacios fantasma antes de que lleguen a PostgreSQL (rompen el cruce de nombres con el LLM)
+    const platoSaneado = { ...plato, nombre: plato.nombre.trim() };
     const url = esNuevo ? 'http://localhost:8000/admin/platos' : `http://localhost:8000/admin/platos/${plato.id_plato}`;
     const method = esNuevo ? 'POST' : 'PUT';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(plato) });
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(platoSaneado) });
     if (res.ok) {
       mostrarMensaje(esNuevo ? "✅ Plato creado" : "✅ Plato actualizado");
       cargarPlatos();

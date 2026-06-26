@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from psycopg2.extras import RealDictCursor
 from app.core.database import get_db
@@ -25,12 +25,24 @@ class IngredienteBase(BaseModel):
     stock_actual: float
     precio_extra: float
 
+    @field_validator("nombre")
+    @classmethod
+    def sin_espacios_fantasma(cls, v: str) -> str:
+        return v.strip()
+
 class PlatoBase(BaseModel):
     id_categoria: int
     nombre: str
     precio_base: float
     requiere_coccion: bool
     tiempo_prep_min: int
+
+    @field_validator("nombre")
+    @classmethod
+    def sin_espacios_fantasma(cls, v: str) -> str:
+        # Evita que "Combo Especial " se guarde distinto de "Combo Especial"
+        # y rompa el cruce de nombres con el LLM (ver ia_service.py).
+        return v.strip()
 
 class RecetaItem(BaseModel):
     id_plato: int

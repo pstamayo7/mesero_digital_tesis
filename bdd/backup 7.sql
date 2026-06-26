@@ -2,12 +2,12 @@
 -- PostgreSQL database dump
 --
 
-\restrict Gf2nhcWNmGWc7XVxNWGogroh0CUHjCg6Hy2HKBGj0z5FOHH51gYefwWXbbNLSNT
+\restrict trTAQhjV72SXVS3b378I4IyQohRSuxiPkWhrJeCVzcOjORefLUtip4d3hg2fWFJ
 
 -- Dumped from database version 15.18
 -- Dumped by pg_dump version 18.3
 
--- Started on 2026-05-31 19:02:10
+-- Started on 2026-06-23 11:31:47
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -111,7 +111,7 @@ CREATE SEQUENCE public.categoria_id_categoria_seq
 ALTER SEQUENCE public.categoria_id_categoria_seq OWNER TO admin;
 
 --
--- TOC entry 3508 (class 0 OID 0)
+-- TOC entry 3511 (class 0 OID 0)
 -- Dependencies: 216
 -- Name: categoria_id_categoria_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
 --
@@ -151,7 +151,8 @@ CREATE TABLE public.detalle_pedido (
     especificaciones_ia text,
     fecha_inicio_preparacion timestamp without time zone,
     tiempo_asignado_cocina integer DEFAULT 0,
-    fecha_entrega timestamp without time zone
+    fecha_entrega timestamp without time zone,
+    subtotal_calculado numeric(8,2) DEFAULT 0.00
 );
 
 
@@ -174,7 +175,7 @@ CREATE SEQUENCE public.detalle_pedido_id_detalle_seq
 ALTER SEQUENCE public.detalle_pedido_id_detalle_seq OWNER TO admin;
 
 --
--- TOC entry 3509 (class 0 OID 0)
+-- TOC entry 3512 (class 0 OID 0)
 -- Dependencies: 225
 -- Name: detalle_pedido_id_detalle_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
 --
@@ -191,7 +192,8 @@ CREATE TABLE public.ingrediente (
     id_ingrediente integer NOT NULL,
     nombre character varying(50) NOT NULL,
     stock_actual numeric(8,2) NOT NULL,
-    precio_extra numeric(5,2) DEFAULT 0.00
+    precio_extra numeric(5,2) DEFAULT 0.00,
+    cantidad_porcion numeric(8,2) DEFAULT 0.00
 );
 
 
@@ -214,7 +216,7 @@ CREATE SEQUENCE public.ingrediente_id_ingrediente_seq
 ALTER SEQUENCE public.ingrediente_id_ingrediente_seq OWNER TO admin;
 
 --
--- TOC entry 3510 (class 0 OID 0)
+-- TOC entry 3513 (class 0 OID 0)
 -- Dependencies: 220
 -- Name: ingrediente_id_ingrediente_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
 --
@@ -254,7 +256,7 @@ CREATE SEQUENCE public.mesa_id_mesa_seq
 ALTER SEQUENCE public.mesa_id_mesa_seq OWNER TO admin;
 
 --
--- TOC entry 3511 (class 0 OID 0)
+-- TOC entry 3514 (class 0 OID 0)
 -- Dependencies: 214
 -- Name: mesa_id_mesa_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
 --
@@ -295,7 +297,7 @@ CREATE SEQUENCE public.modificacion_item_id_modificacion_seq
 ALTER SEQUENCE public.modificacion_item_id_modificacion_seq OWNER TO admin;
 
 --
--- TOC entry 3512 (class 0 OID 0)
+-- TOC entry 3515 (class 0 OID 0)
 -- Dependencies: 227
 -- Name: modificacion_item_id_modificacion_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
 --
@@ -339,7 +341,7 @@ CREATE SEQUENCE public.pedido_id_pedido_seq
 ALTER SEQUENCE public.pedido_id_pedido_seq OWNER TO admin;
 
 --
--- TOC entry 3513 (class 0 OID 0)
+-- TOC entry 3516 (class 0 OID 0)
 -- Dependencies: 223
 -- Name: pedido_id_pedido_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
 --
@@ -358,7 +360,8 @@ CREATE TABLE public.plato (
     nombre character varying(100) NOT NULL,
     precio_base numeric(6,2) NOT NULL,
     tiempo_prep_min integer,
-    requiere_coccion boolean DEFAULT true
+    requiere_coccion boolean DEFAULT true,
+    ruta_imagen character varying(255) DEFAULT '/imagenes/default.png'::character varying
 );
 
 
@@ -381,7 +384,7 @@ CREATE SEQUENCE public.plato_id_plato_seq
 ALTER SEQUENCE public.plato_id_plato_seq OWNER TO admin;
 
 --
--- TOC entry 3514 (class 0 OID 0)
+-- TOC entry 3517 (class 0 OID 0)
 -- Dependencies: 218
 -- Name: plato_id_plato_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
 --
@@ -412,7 +415,7 @@ ALTER TABLE ONLY public.categoria ALTER COLUMN id_categoria SET DEFAULT nextval(
 
 
 --
--- TOC entry 3323 (class 2604 OID 16487)
+-- TOC entry 3325 (class 2604 OID 16487)
 -- Name: detalle_pedido id_detalle; Type: DEFAULT; Schema: public; Owner: admin
 --
 
@@ -420,7 +423,7 @@ ALTER TABLE ONLY public.detalle_pedido ALTER COLUMN id_detalle SET DEFAULT nextv
 
 
 --
--- TOC entry 3315 (class 2604 OID 16448)
+-- TOC entry 3316 (class 2604 OID 16448)
 -- Name: ingrediente id_ingrediente; Type: DEFAULT; Schema: public; Owner: admin
 --
 
@@ -436,7 +439,7 @@ ALTER TABLE ONLY public.mesa ALTER COLUMN id_mesa SET DEFAULT nextval('public.me
 
 
 --
--- TOC entry 3327 (class 2604 OID 16508)
+-- TOC entry 3330 (class 2604 OID 16508)
 -- Name: modificacion_item id_modificacion; Type: DEFAULT; Schema: public; Owner: admin
 --
 
@@ -444,7 +447,7 @@ ALTER TABLE ONLY public.modificacion_item ALTER COLUMN id_modificacion SET DEFAU
 
 
 --
--- TOC entry 3317 (class 2604 OID 16471)
+-- TOC entry 3319 (class 2604 OID 16471)
 -- Name: pedido id_pedido; Type: DEFAULT; Schema: public; Owner: admin
 --
 
@@ -460,7 +463,7 @@ ALTER TABLE ONLY public.plato ALTER COLUMN id_plato SET DEFAULT nextval('public.
 
 
 --
--- TOC entry 3338 (class 2606 OID 16431)
+-- TOC entry 3341 (class 2606 OID 16431)
 -- Name: categoria categoria_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -469,7 +472,7 @@ ALTER TABLE ONLY public.categoria
 
 
 --
--- TOC entry 3352 (class 2606 OID 16535)
+-- TOC entry 3355 (class 2606 OID 16535)
 -- Name: configuracion_operativa configuracion_operativa_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -478,7 +481,7 @@ ALTER TABLE ONLY public.configuracion_operativa
 
 
 --
--- TOC entry 3348 (class 2606 OID 16493)
+-- TOC entry 3351 (class 2606 OID 16493)
 -- Name: detalle_pedido detalle_pedido_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -487,7 +490,7 @@ ALTER TABLE ONLY public.detalle_pedido
 
 
 --
--- TOC entry 3342 (class 2606 OID 16451)
+-- TOC entry 3345 (class 2606 OID 16451)
 -- Name: ingrediente ingrediente_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -496,7 +499,7 @@ ALTER TABLE ONLY public.ingrediente
 
 
 --
--- TOC entry 3336 (class 2606 OID 16424)
+-- TOC entry 3339 (class 2606 OID 16424)
 -- Name: mesa mesa_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -505,7 +508,7 @@ ALTER TABLE ONLY public.mesa
 
 
 --
--- TOC entry 3350 (class 2606 OID 16511)
+-- TOC entry 3353 (class 2606 OID 16511)
 -- Name: modificacion_item modificacion_item_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -514,7 +517,7 @@ ALTER TABLE ONLY public.modificacion_item
 
 
 --
--- TOC entry 3346 (class 2606 OID 16477)
+-- TOC entry 3349 (class 2606 OID 16477)
 -- Name: pedido pedido_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -523,7 +526,7 @@ ALTER TABLE ONLY public.pedido
 
 
 --
--- TOC entry 3340 (class 2606 OID 16438)
+-- TOC entry 3343 (class 2606 OID 16438)
 -- Name: plato plato_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -532,7 +535,7 @@ ALTER TABLE ONLY public.plato
 
 
 --
--- TOC entry 3344 (class 2606 OID 16456)
+-- TOC entry 3347 (class 2606 OID 16456)
 -- Name: receta receta_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -541,7 +544,7 @@ ALTER TABLE ONLY public.receta
 
 
 --
--- TOC entry 3357 (class 2606 OID 16494)
+-- TOC entry 3360 (class 2606 OID 16494)
 -- Name: detalle_pedido detalle_pedido_id_pedido_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -550,7 +553,7 @@ ALTER TABLE ONLY public.detalle_pedido
 
 
 --
--- TOC entry 3358 (class 2606 OID 16499)
+-- TOC entry 3361 (class 2606 OID 16499)
 -- Name: detalle_pedido detalle_pedido_id_plato_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -559,7 +562,7 @@ ALTER TABLE ONLY public.detalle_pedido
 
 
 --
--- TOC entry 3359 (class 2606 OID 16512)
+-- TOC entry 3362 (class 2606 OID 16512)
 -- Name: modificacion_item modificacion_item_id_detalle_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -568,7 +571,7 @@ ALTER TABLE ONLY public.modificacion_item
 
 
 --
--- TOC entry 3360 (class 2606 OID 16517)
+-- TOC entry 3363 (class 2606 OID 16517)
 -- Name: modificacion_item modificacion_item_id_ingrediente_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -577,7 +580,7 @@ ALTER TABLE ONLY public.modificacion_item
 
 
 --
--- TOC entry 3356 (class 2606 OID 16478)
+-- TOC entry 3359 (class 2606 OID 16478)
 -- Name: pedido pedido_id_mesa_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -586,7 +589,7 @@ ALTER TABLE ONLY public.pedido
 
 
 --
--- TOC entry 3353 (class 2606 OID 16439)
+-- TOC entry 3356 (class 2606 OID 16439)
 -- Name: plato plato_id_categoria_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -595,7 +598,7 @@ ALTER TABLE ONLY public.plato
 
 
 --
--- TOC entry 3354 (class 2606 OID 16462)
+-- TOC entry 3357 (class 2606 OID 16462)
 -- Name: receta receta_id_ingrediente_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -604,7 +607,7 @@ ALTER TABLE ONLY public.receta
 
 
 --
--- TOC entry 3355 (class 2606 OID 16457)
+-- TOC entry 3358 (class 2606 OID 16457)
 -- Name: receta receta_id_plato_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
 --
 
@@ -612,11 +615,11 @@ ALTER TABLE ONLY public.receta
     ADD CONSTRAINT receta_id_plato_fkey FOREIGN KEY (id_plato) REFERENCES public.plato(id_plato);
 
 
--- Completed on 2026-05-31 19:02:11
+-- Completed on 2026-06-23 11:31:47
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Gf2nhcWNmGWc7XVxNWGogroh0CUHjCg6Hy2HKBGj0z5FOHH51gYefwWXbbNLSNT
+\unrestrict trTAQhjV72SXVS3b378I4IyQohRSuxiPkWhrJeCVzcOjORefLUtip4d3hg2fWFJ
 

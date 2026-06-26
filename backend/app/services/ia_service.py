@@ -10,6 +10,10 @@ print("⏳ Cargando modelo acústico (Faster-Whisper)...")
 modelo_whisper = WhisperModel("small", device="cpu", compute_type="int8")
 print("✅ Oído de IA listo.")
 
+def _normalizar(texto: str) -> str:
+    """Punto único de normalización para cruzar nombres LLM <-> BD: sin espacios fantasma ni distinción de mayúsculas."""
+    return (texto or "").strip().lower()
+
 def obtener_menu_disponible():
     try:
         conexion = get_db_connection()
@@ -18,7 +22,7 @@ def obtener_menu_disponible():
         platos = cursor.fetchall()
         cursor.close()
         conexion.close()
-        return [plato[0] for plato in platos]
+        return [plato[0].strip() for plato in platos]
     except Exception as e:
         print(f"⚠️ Error BD: {e}")
         return ["Fritada Tradicional", "Fritada Especial Doble", "Llapingachos", "Cola Grande"]
@@ -30,7 +34,7 @@ def obtener_ingredientes_disponibles():
         ingredientes = cursor.fetchall()
         cursor.close()
         conexion.close()
-        return [ingrediente[0] for ingrediente in ingredientes]
+        return [ingrediente[0].strip() for ingrediente in ingredientes]
     except Exception as e:
         print(f"⚠️ Error BD Ingredientes: {e}")
         return ["Mote", "Tostado", "Maduro", "Cebolla", "Chicharrón", "Aguacate", "Tomate"]
@@ -42,11 +46,11 @@ def obtener_diccionario_precios():
 
         # Extraemos { "fritada tradicional": 5.00, "llapingachos": 3.50 }
         cursor.execute("SELECT nombre, precio_base FROM Plato;")
-        platos = {row[0].lower(): float(row[1]) for row in cursor.fetchall()}
+        platos = {_normalizar(row[0]): float(row[1]) for row in cursor.fetchall()}
 
         # Extraemos { "mote": 0.50, "aguacate": 1.00 }
         cursor.execute("SELECT nombre, precio_extra FROM Ingrediente;")
-        extras = {row[0].lower(): float(row[1]) for row in cursor.fetchall()}
+        extras = {_normalizar(row[0]): float(row[1]) for row in cursor.fetchall()}
 
         cursor.close()
         conexion.close()
@@ -67,7 +71,7 @@ def validar_stock_carrito(carrito_list):
         cursor.execute("SELECT nombre, stock_actual, cantidad_porcion FROM Ingrediente;")
         ingredientes_db = {}
         for row in cursor.fetchall():
-            nombre_ing = row[0].strip().lower()
+            nombre_ing = _normalizar(row[0])
             ingredientes_db[nombre_ing] = {
                 "stock": float(row[1]),
                 "porcion": float(row[2])
@@ -82,8 +86,8 @@ def validar_stock_carrito(carrito_list):
         """)
         recetas_db = {}
         for row in cursor.fetchall():
-            plato = row[0].strip().lower()
-            ingrediente = row[1].strip().lower()
+            plato = _normalizar(row[0])
+            ingrediente = _normalizar(row[1])
             cantidad = float(row[2])
             if plato not in recetas_db:
                 recetas_db[plato] = {}
@@ -103,7 +107,7 @@ def validar_stock_carrito(carrito_list):
             return None
 
         for item in carrito_list:
-            plato_nombre = item["plato"].strip().lower()
+            plato_nombre = _normalizar(item["plato"])
             cantidad_plato = item["cantidad"]
 
             # A. Consumo del Plato Base (o Porción Suelta)
@@ -121,7 +125,7 @@ def validar_stock_carrito(carrito_list):
             # B. Consumo de las Modificaciones (EXTRAS suman, SIN restan)
             for mod in item.get("mods_estructuradas", []):
                 tipo_mod = mod.get("tipo", "").upper()
-                ing_mod = mod.get("ingrediente", "").strip().lower()
+                ing_mod = _normalizar(mod.get("ingrediente", ""))
 
                 for db_nombre, datos in ingredientes_db.items():
                     if ing_mod in db_nombre or db_nombre in ing_mod:
@@ -313,8 +317,8 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
             
             # 🌟 NORMALIZAMOS LOS NOMBRES DE LOS INGREDIENTES
             for m in mods_lista:
-                m.tipo = m.tipo.upper() 
-                nombre_ing_low = m.ingrediente.strip().lower()
+                m.tipo = m.tipo.upper()
+                nombre_ing_low = _normalizar(m.ingrediente)
                 
                 # Buscamos su nombre oficial en la base de datos
                 for db_nombre in precios_extras.keys():
@@ -333,7 +337,7 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
             for item in carrito_list:
                 item_mods = item.get("modificaciones", "")
                 
-                if item.get("plato", "").lower() == accion.plato.lower() and item_mods == mods_str:
+                if _normalizar(item.get("plato", "")) == _normalizar(accion.plato) and item_mods == mods_str:
                     if accion.accion.upper() == "AGREGAR":
                         item["cantidad"] = item.get("cantidad", 0) + accion.cantidad
                     elif accion.accion.upper() == "QUITAR":
@@ -357,7 +361,7 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
         total_final = 0.0
 
         for item in carrito_list:
-            nombre_plato_low = item["plato"].lower()
+            nombre_plato_low = _normalizar(item["plato"])
             
             # 1. Buscamos el precio base en la tabla PLATOS
             precio_base = precios_platos.get(nombre_plato_low, 0.0) 
@@ -379,7 +383,7 @@ def procesar_audio_con_ia(ruta_temporal_audio: str, carrito_actual: str):
            # Costear las modificaciones
             for mod in item.get("mods_estructuradas", []):
                 if mod.get("tipo", "").strip().upper() == "EXTRA":
-                    nombre_ing_low = mod.get("ingrediente", "").strip().lower()
+                    nombre_ing_low = _normalizar(mod.get("ingrediente", ""))
                     costo_extra = 0.0
                     nombre_oficial = nombre_ing_low
                     

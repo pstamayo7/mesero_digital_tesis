@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 from enum import Enum
 
@@ -7,6 +7,17 @@ class TipoMod(str, Enum):
     EXTRA = "EXTRA"
     SIN = "SIN"
 
+# Lo que le enviaremos de regreso a React (El carrito final calculado por Python)
+class ModificacionStruct(BaseModel):
+    tipo: str = Field(description="Debe ser 'EXTRA', 'SIN', o 'POCO'")
+    ingrediente: str = Field(description="Nombre del ingrediente")
+    recargo: float = 0.0 # 🌟 NUEVO: Para enviar cuánto costó este extra
+
+    @field_validator("ingrediente")
+    @classmethod
+    def sin_espacios_fantasma(cls, v: str) -> str:
+        return v.strip()
+
 class AccionLLM(BaseModel):
     accion: str = Field(description="'AGREGAR' o 'QUITAR'")
     plato: str = Field(description="Nombre exacto del platillo")
@@ -14,17 +25,18 @@ class AccionLLM(BaseModel):
     # Lo hacemos Optional por si la IA devuelve 'null'
     modificaciones: Optional[List[ModificacionStruct]] = Field(default=[], description="Lista de extras o sin ingredientes")
 
+    @field_validator("plato")
+    @classmethod
+    def sin_espacios_fantasma(cls, v: str) -> str:
+        # El LLM y la BD pueden devolver nombres con espacios al inicio/final
+        # ("Combo Especial " vs "Combo Especial"): normalizamos en el borde de entrada.
+        return v.strip()
+65
 class SalidaLLM(BaseModel):
     razonamiento: str = "" # 🌟 AÑADIMOS ESTO PARA QUE LA IA PIENSE
     respuesta_mesero: str
     numero_mesa: int
     acciones: List[AccionLLM]
-
-# Lo que le enviaremos de regreso a React (El carrito final calculado por Python)
-class ModificacionStruct(BaseModel):
-    tipo: str = Field(description="Debe ser 'EXTRA', 'SIN', o 'POCO'")
-    ingrediente: str = Field(description="Nombre del ingrediente")
-    recargo: float = 0.0 # 🌟 NUEVO: Para enviar cuánto costó este extra
 
 class ItemPedido(BaseModel):
     plato: str
@@ -33,6 +45,11 @@ class ItemPedido(BaseModel):
     mods_estructuradas: List[ModificacionStruct] = []
     precio_unitario: float = 0.0 # 🌟 NUEVO: El precio base de PostgreSQL
     subtotal: float = 0.0 # 🌟 NUEVO: (precio base + recargos) * cantidad
+
+    @field_validator("plato")
+    @classmethod
+    def sin_espacios_fantasma(cls, v: str) -> str:
+        return v.strip()
 
 class OrdenEstructurada(BaseModel):
     respuesta_mesero: str
