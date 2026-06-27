@@ -53,18 +53,27 @@ function MonitorCocina() {
   const [comandas, setComandas] = useState([])
   const [cargando, setCargando] = useState(true)
 
-  // 🌟 REPORTAR PROBLEMA: id_detalle del ítem que se está reportando (null = modal cerrado)
+  // 🌟 REPORTAR PROBLEMA: { id_detalle, id_plato } del ítem reportado (null = modal cerrado)
   const [itemReportando, setItemReportando] = useState(null)
   const [tipoProblema, setTipoProblema] = useState('ERROR_HUMANO')
   const [ingredienteAgotado, setIngredienteAgotado] = useState('')
-  const [ingredientesCatalogo, setIngredientesCatalogo] = useState([])
+  const [ingredientesDelPlato, setIngredientesDelPlato] = useState([])
+  const [cargandoIngredientes, setCargandoIngredientes] = useState(false)
 
+  // 🌟 TAREA 1: solo cargamos la receta del plato que se está reportando (no la bodega
+  // completa). Misma ruta que ya usa el modal de edición táctil del Kiosko.
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/admin/ingredientes')
+    if (!itemReportando) {
+      setIngredientesDelPlato([])
+      return
+    }
+    setCargandoIngredientes(true)
+    fetch(`http://127.0.0.1:8000/menu/${itemReportando.id_plato}/ingredientes`)
       .then(res => res.json())
-      .then(data => setIngredientesCatalogo(Array.isArray(data) ? data : []))
-      .catch(err => console.error("Error cargando catálogo de ingredientes:", err))
-  }, [])
+      .then(data => setIngredientesDelPlato(data.ingredientes_base || []))
+      .catch(err => console.error("Error cargando receta del plato:", err))
+      .finally(() => setCargandoIngredientes(false))
+  }, [itemReportando])
 
   const cargarComandas = () => {
     fetch('http://127.0.0.1:8000/cocina/ordenes')
@@ -157,8 +166,8 @@ function MonitorCocina() {
     }
   }
 
-  const abrirModalProblema = (id_detalle) => {
-    setItemReportando(id_detalle)
+  const abrirModalProblema = (id_detalle, id_plato) => {
+    setItemReportando({ id_detalle, id_plato })
     setTipoProblema('ERROR_HUMANO')
     setIngredienteAgotado('')
   }
@@ -166,7 +175,7 @@ function MonitorCocina() {
   const confirmarProblema = async () => {
     try {
       const payload = {
-        item_pedido_id: itemReportando,
+        item_pedido_id: itemReportando.id_detalle,
         tipo_problema: tipoProblema,
         ingrediente_agotado: tipoProblema === 'FALTA_STOCK' ? ingredienteAgotado : null
       }
@@ -183,11 +192,13 @@ function MonitorCocina() {
         return
       }
 
-      // 🌟 Actualizamos la tarjeta localmente (sin esperar al próximo polling de 4s)
+      // 🌟 TAREA 2: Actualizamos la tarjeta localmente (sin esperar al próximo polling de
+      // 4s). El render más abajo separa los ítems SUSPENDIDO en su propia sección de
+      // "Incidentes" para que no estorben la vista activa de preparación.
       setComandas(prev => prev.map(comanda => ({
         ...comanda,
         items: comanda.items.map(item =>
-          item.id_detalle === itemReportando ? { ...item, estado_item: 'SUSPENDIDO' } : item
+          item.id_detalle === itemReportando.id_detalle ? { ...item, estado_item: 'SUSPENDIDO' } : item
         )
       })))
 
@@ -223,6 +234,10 @@ function MonitorCocina() {
             // Verificamos si este pedido es el que toca atender obligatoriamente
             const esElTurno = comanda.id_pedido === idSiguienteTurno
 
+            // 🌟 TAREA 2: separamos los ítems suspendidos para que no estorben la cola activa.
+            const itemsActivos = comanda.items.filter(i => i.estado_item !== 'SUSPENDIDO')
+            const itemsSuspendidos = comanda.items.filter(i => i.estado_item === 'SUSPENDIDO')
+
             return (
               <div key={comanda.id_pedido} className="comanda-tarjeta">
                 <div className="comanda-cabecera">
@@ -244,24 +259,13 @@ function MonitorCocina() {
 
 
                 <div className="comanda-items">
-                  {comanda.items.map((item) => (
+                  {itemsActivos.map((item) => (
                     <div key={item.id_detalle} className={`item-fila estado-${item.estado_item.toLowerCase()}`}>
                       <div className="item-info">
-                        <span
-                          className="item-nombre"
-                          style={item.estado_item === 'SUSPENDIDO' ? { textDecoration: 'line-through', color: '#9ca3af' } : undefined}
-                        >
+                        <span className="item-nombre">
                           <strong>{item.cantidad}x</strong> {item.plato_nombre}
                         </span>
                         {item.especificaciones_ia && <span className="item-notas">⚠️ {item.especificaciones_ia}</span>}
-                        {item.estado_item === 'SUSPENDIDO' && (
-                          <span style={{
-                            backgroundColor: '#991b1b', color: 'white', fontSize: '0.7rem',
-                            fontWeight: 'bold', padding: '2px 8px', borderRadius: '10px', marginLeft: '8px'
-                          }}>
-                            🚫 SUSPENDIDO
-                          </span>
-                        )}
                       </div>
 
                       <div className="item-acciones">
@@ -289,7 +293,7 @@ function MonitorCocina() {
                               ✓ ¡Listo!
                             </button>
                             <button
-                              onClick={() => abrirModalProblema(item.id_detalle)}
+                              onClick={() => abrirModalProblema(item.id_detalle, item.id_plato)}
                               className="btn-accion demorar"
                               style={{ flex: '0.5', backgroundColor: '#b45309' }}
                             >
@@ -301,6 +305,28 @@ function MonitorCocina() {
                     </div>
                   ))}
                 </div>
+
+                {/* 🌟 TAREA 2: sección separada de incidentes, fuera de la vista activa */}
+                {itemsSuspendidos.length > 0 && (
+                  <div className="comanda-incidentes" style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #d1d5db' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#991b1b' }}>🚫 Incidentes</span>
+                    {itemsSuspendidos.map((item) => (
+                      <div key={item.id_detalle} className="item-fila" style={{ opacity: 0.7 }}>
+                        <div className="item-info">
+                          <span className="item-nombre" style={{ textDecoration: 'line-through', color: '#9ca3af' }}>
+                            <strong>{item.cantidad}x</strong> {item.plato_nombre}
+                          </span>
+                          <span style={{
+                            backgroundColor: '#991b1b', color: 'white', fontSize: '0.7rem',
+                            fontWeight: 'bold', padding: '2px 8px', borderRadius: '10px', marginLeft: '8px'
+                          }}>
+                            SUSPENDIDO
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -349,16 +375,22 @@ function MonitorCocina() {
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold' }}>
                   ¿Qué ingrediente se agotó?
                 </label>
-                <select
-                  value={ingredienteAgotado}
-                  onChange={(e) => setIngredienteAgotado(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db' }}
-                >
-                  <option value="">-- Selecciona un ingrediente --</option>
-                  {ingredientesCatalogo.map(ing => (
-                    <option key={ing.id_ingrediente} value={ing.nombre}>{ing.nombre}</option>
-                  ))}
-                </select>
+                {cargandoIngredientes ? (
+                  <p>Cargando receta del plato...</p>
+                ) : ingredientesDelPlato.length === 0 ? (
+                  <p style={{ color: '#6b7280' }}>Este plato no tiene ingredientes base configurados.</p>
+                ) : (
+                  <select
+                    value={ingredienteAgotado}
+                    onChange={(e) => setIngredienteAgotado(e.target.value)}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                  >
+                    <option value="">-- Selecciona un ingrediente --</option>
+                    {ingredientesDelPlato.map(ingrediente => (
+                      <option key={ingrediente} value={ingrediente}>{ingrediente}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
 

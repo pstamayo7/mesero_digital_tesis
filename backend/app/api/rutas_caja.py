@@ -15,13 +15,32 @@ def obtener_cuentas_pendientes():
         from psycopg2.extras import RealDictCursor
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        # 🌟 FACTURACIÓN AUTOMÁTICA: 'total_final' ya NO se lee de la columna estática
+        # pe.total_final (sellada al confirmar la orden, antes de cualquier incidente de
+        # cocina). Se recalcula en vivo con un SUM que excluye CANCELADO y SUSPENDIDO, así
+        # que un plato caído por error humano o falta de stock se resta de la cuenta sin
+        # que nadie tenga que tocarla a mano.
         query = """
-            SELECT 
-                pe.id_pedido, 
-                pe.id_mesa, 
-                pe.cliente_nombre, 
-                pe.total_final, 
+            SELECT
+                pe.id_pedido,
+                pe.id_mesa,
+                pe.cliente_nombre,
                 pe.fecha_apertura,
+                COALESCE(
+                    (
+                        SELECT SUM(
+                            CASE
+                                -- Si n8n guardó el subtotal, usamos ese (precio inmutable)
+                                WHEN dp.subtotal_calculado > 0 THEN dp.subtotal_calculado
+                                -- Si es un pedido viejo de prueba, calculamos precio base * cant
+                                ELSE p.precio_base * dp.cantidad
+                            END
+                        )
+                        FROM Detalle_Pedido dp
+                        JOIN Plato p ON dp.id_plato = p.id_plato
+                        WHERE dp.id_pedido = pe.id_pedido AND dp.estado_item NOT IN ('CANCELADO', 'SUSPENDIDO')
+                    ), 0
+                ) as total_final,
                 COALESCE(
                     (
                         SELECT json_agg(
@@ -29,20 +48,18 @@ def obtener_cuentas_pendientes():
                                 'cantidad', dp.cantidad,
                                 'plato', p.nombre,
                                 'notas', dp.especificaciones_ia,
-                                'subtotal', CASE 
-                                    -- Si n8n guardó el subtotal, usamos ese (precio inmutable)
-                                    WHEN dp.subtotal_calculado > 0 THEN dp.subtotal_calculado 
-                                    -- Si es un pedido viejo de prueba, calculamos precio base * cant
-                                    ELSE p.precio_base * dp.cantidad 
+                                'subtotal', CASE
+                                    WHEN dp.subtotal_calculado > 0 THEN dp.subtotal_calculado
+                                    ELSE p.precio_base * dp.cantidad
                                 END
                             )
                         )
                         FROM Detalle_Pedido dp
                         JOIN Plato p ON dp.id_plato = p.id_plato
-                        WHERE dp.id_pedido = pe.id_pedido AND dp.estado_item != 'CANCELADO'
+                        WHERE dp.id_pedido = pe.id_pedido AND dp.estado_item NOT IN ('CANCELADO', 'SUSPENDIDO')
                     ), '[]'::json
                 ) as detalles
-            FROM Pedido pe 
+            FROM Pedido pe
             WHERE pe.estado_pago = 'PENDIENTE'
             ORDER BY pe.fecha_apertura ASC;
         """

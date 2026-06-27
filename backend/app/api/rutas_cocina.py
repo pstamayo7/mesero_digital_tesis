@@ -102,11 +102,16 @@ def obtener_ordenes_cocina():
         conn.commit()
         
         # 4. CONSULTA FINAL: Ahora devolvemos requiere_coccion y el tiempo_asignado al frontend
+        # 🌟 p.id_plato: el Monitor de Cocina lo necesita para pedir la receta exacta de
+        # ESE plato (/menu/{id_plato}/ingredientes) al abrir el modal de "Reportar Problema",
+        # en vez de mostrar el catálogo completo de ingredientes de la bodega.
+        # 🛡️ El filtro IN ('SOLICITADO', 'PREPARANDO') ya excluye 'SUSPENDIDO' (y 'CANCELADO'/
+        # 'ENTREGADO'): un ítem suspendido sale de la cola de producción en el siguiente poll.
         query = """
-            SELECT 
-                dp.id_detalle, dp.id_pedido, p.nombre AS plato_nombre, 
+            SELECT
+                dp.id_detalle, dp.id_pedido, p.id_plato, p.nombre AS plato_nombre,
                 p.requiere_coccion, dp.tiempo_asignado_cocina,
-                dp.cantidad, dp.estado_item, dp.especificaciones_ia, 
+                dp.cantidad, dp.estado_item, dp.especificaciones_ia,
                 dp.fecha_solicitud, dp.fecha_inicio_preparacion, pe.id_mesa,
                 pe.cliente_nombre -- 🌟 AGREGAR ESTA LÍNEA
             FROM Detalle_Pedido dp
