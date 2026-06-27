@@ -2,6 +2,7 @@ import math
 from fastapi import APIRouter, HTTPException
 from psycopg2.extras import RealDictCursor
 from app.core.database import get_db_connection
+from app.schemas.pedido_schema import ReporteProblemaCocina
 
 router = APIRouter()
 
@@ -136,6 +137,39 @@ def rechazar_plato(id_detalle: int):
         cursor.execute(query, (id_detalle,))
         conn.commit()
         return {"mensaje": f"Plato {id_detalle} anulado por excepción."}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+@router.post("/cocina/problema-item", tags=["Monitor de Cocina"])
+def reportar_problema_item(reporte: ReporteProblemaCocina):
+    """
+    Manejo de crisis: el cocinero suspende un ítem por error humano o por falta de stock.
+    Si es FALTA_STOCK, además se pone el ingrediente reportado en stock_actual = 0 para
+    que ia_service.py (validar_stock_carrito) y el Kiosko dejen de venderlo de inmediato.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "UPDATE Detalle_Pedido SET estado_item = 'SUSPENDIDO' WHERE id_detalle = %s;",
+            (reporte.item_pedido_id,)
+        )
+
+        if reporte.tipo_problema == "FALTA_STOCK" and reporte.ingrediente_agotado:
+            cursor.execute(
+                "UPDATE Ingrediente SET stock_actual = 0 WHERE nombre ILIKE %s;",
+                (f"%{reporte.ingrediente_agotado}%",)
+            )
+
+        conn.commit()
+        return {"mensaje": f"Ítem {reporte.item_pedido_id} suspendido."}
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))

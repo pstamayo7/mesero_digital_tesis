@@ -137,3 +137,15 @@ class InteraccionBienvenida(BaseModel):
     respuesta_mesero: str
     nombre_cliente: Optional[str] = ""
     nombre_confirmado: bool = False
+
+class ReporteProblemaCocina(BaseModel):
+    """Lo que manda el Monitor de Cocina cuando un cocinero suspende un ítem por error
+    humano o por falta de stock (ver rutas_cocina.py: POST /cocina/problema-item)."""
+    item_pedido_id: int
+    tipo_problema: Literal["ERROR_HUMANO", "FALTA_STOCK"]
+    ingrediente_agotado: Optional[str] = None
+
+    @field_validator("ingrediente_agotado")
+    @classmethod
+    def sin_espacios_fantasma(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() if v else v

@@ -53,6 +53,19 @@ function MonitorCocina() {
   const [comandas, setComandas] = useState([])
   const [cargando, setCargando] = useState(true)
 
+  // 🌟 REPORTAR PROBLEMA: id_detalle del ítem que se está reportando (null = modal cerrado)
+  const [itemReportando, setItemReportando] = useState(null)
+  const [tipoProblema, setTipoProblema] = useState('ERROR_HUMANO')
+  const [ingredienteAgotado, setIngredienteAgotado] = useState('')
+  const [ingredientesCatalogo, setIngredientesCatalogo] = useState([])
+
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/admin/ingredientes')
+      .then(res => res.json())
+      .then(data => setIngredientesCatalogo(Array.isArray(data) ? data : []))
+      .catch(err => console.error("Error cargando catálogo de ingredientes:", err))
+  }, [])
+
   const cargarComandas = () => {
     fetch('http://127.0.0.1:8000/cocina/ordenes')
       .then(res => res.json())
@@ -144,6 +157,47 @@ function MonitorCocina() {
     }
   }
 
+  const abrirModalProblema = (id_detalle) => {
+    setItemReportando(id_detalle)
+    setTipoProblema('ERROR_HUMANO')
+    setIngredienteAgotado('')
+  }
+
+  const confirmarProblema = async () => {
+    try {
+      const payload = {
+        item_pedido_id: itemReportando,
+        tipo_problema: tipoProblema,
+        ingrediente_agotado: tipoProblema === 'FALTA_STOCK' ? ingredienteAgotado : null
+      }
+
+      const respuesta = await fetch('http://127.0.0.1:8000/cocina/problema-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (!respuesta.ok) {
+        const errorDatos = await respuesta.json()
+        alert(`❌ Error del servidor: ${errorDatos.detail || 'Fallo desconocido'}`)
+        return
+      }
+
+      // 🌟 Actualizamos la tarjeta localmente (sin esperar al próximo polling de 4s)
+      setComandas(prev => prev.map(comanda => ({
+        ...comanda,
+        items: comanda.items.map(item =>
+          item.id_detalle === itemReportando ? { ...item, estado_item: 'SUSPENDIDO' } : item
+        )
+      })))
+
+      setItemReportando(null)
+    } catch (error) {
+      console.error("Error reportando problema:", error)
+      alert("❌ No se pudo conectar con el servidor.")
+    }
+  }
+
   const pedidosEnPreparacion = comandas.filter(c => c.items.some(i => i.estado_item === 'PREPARANDO')).length;
   // 2. ¿Podemos aceptar más? Solo si hay menos de 2.
   const cocinaSaturada = pedidosEnPreparacion >= 2;
@@ -193,8 +247,21 @@ function MonitorCocina() {
                   {comanda.items.map((item) => (
                     <div key={item.id_detalle} className={`item-fila estado-${item.estado_item.toLowerCase()}`}>
                       <div className="item-info">
-                        <span className="item-nombre"><strong>{item.cantidad}x</strong> {item.plato_nombre}</span>
+                        <span
+                          className="item-nombre"
+                          style={item.estado_item === 'SUSPENDIDO' ? { textDecoration: 'line-through', color: '#9ca3af' } : undefined}
+                        >
+                          <strong>{item.cantidad}x</strong> {item.plato_nombre}
+                        </span>
                         {item.especificaciones_ia && <span className="item-notas">⚠️ {item.especificaciones_ia}</span>}
+                        {item.estado_item === 'SUSPENDIDO' && (
+                          <span style={{
+                            backgroundColor: '#991b1b', color: 'white', fontSize: '0.7rem',
+                            fontWeight: 'bold', padding: '2px 8px', borderRadius: '10px', marginLeft: '8px'
+                          }}>
+                            🚫 SUSPENDIDO
+                          </span>
+                        )}
                       </div>
 
                       <div className="item-acciones">
@@ -221,8 +288,12 @@ function MonitorCocina() {
                             <button onClick={() => manejarAccionItem(item.id_detalle, 'LISTO')} className="btn-accion listo">
                               ✓ ¡Listo!
                             </button>
-                            <button onClick={() => manejarAccionItem(item.id_detalle, 'DEMORADO')} className="btn-accion demorar" style={{ flex: '0.5' }}>
-                              Retraso
+                            <button
+                              onClick={() => abrirModalProblema(item.id_detalle)}
+                              className="btn-accion demorar"
+                              style={{ flex: '0.5', backgroundColor: '#b45309' }}
+                            >
+                              ⚠️ Reportar Problema
                             </button>
                           </>
                         )}
@@ -233,6 +304,85 @@ function MonitorCocina() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {itemReportando !== null && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 1000
+          }}
+          onClick={() => setItemReportando(null)}
+        >
+          <div
+            style={{ backgroundColor: 'white', color: '#1f2937', borderRadius: '12px', padding: '25px', maxWidth: '420px', width: '90%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ marginTop: 0 }}>🚨 Reportar Problema</h2>
+            <p>¿Cuál es el problema con este plato?</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="tipoProblema"
+                  checked={tipoProblema === 'ERROR_HUMANO'}
+                  onChange={() => setTipoProblema('ERROR_HUMANO')}
+                />
+                Accidente / Error en cocina
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="tipoProblema"
+                  checked={tipoProblema === 'FALTA_STOCK'}
+                  onChange={() => setTipoProblema('FALTA_STOCK')}
+                />
+                Falta de Stock
+              </label>
+            </div>
+
+            {tipoProblema === 'FALTA_STOCK' && (
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold' }}>
+                  ¿Qué ingrediente se agotó?
+                </label>
+                <select
+                  value={ingredienteAgotado}
+                  onChange={(e) => setIngredienteAgotado(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                >
+                  <option value="">-- Selecciona un ingrediente --</option>
+                  {ingredientesCatalogo.map(ing => (
+                    <option key={ing.id_ingrediente} value={ing.nombre}>{ing.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setItemReportando(null)}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#6b7280', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarProblema}
+                disabled={tipoProblema === 'FALTA_STOCK' && !ingredienteAgotado}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: '8px', border: 'none',
+                  backgroundColor: (tipoProblema === 'FALTA_STOCK' && !ingredienteAgotado) ? '#9ca3af' : '#991b1b',
+                  color: 'white', fontWeight: 'bold',
+                  cursor: (tipoProblema === 'FALTA_STOCK' && !ingredienteAgotado) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
