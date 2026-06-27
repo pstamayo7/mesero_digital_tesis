@@ -13,41 +13,31 @@ class DatosAnalisis(BaseModel):
     periodo: str = "este periodo"
 
 @router.get("/reportes/kpis")
-def obtener_kpis(periodo: str = 'mes', db=Depends(get_db)):
+def obtener_kpis(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)):
+    """
+    🌟 CONTROLADOR UNIVERSAL DE FECHAS: ya no recibe 'periodo' (hoy/semana/mes), recibe el
+    rango exacto que decide el front (botones rápidos o fechas personalizadas), igual que
+    /reportes/platos, /reportes/operacion, /reportes/evolucion, /reportes/heatmap y
+    /reportes/ventas-periodo. Mismo patrón anti-UTC: comparamos contra strings "YYYY-MM-DD".
+    """
     cursor = db.cursor(cursor_factory=RealDictCursor)
-    
-    # 1. Definir el filtro de fecha según lo que pida el frontend
-    if periodo == 'hoy':
-        filtro_fecha = "DATE(fecha_apertura) = CURRENT_DATE"
-    elif periodo == 'ayer':
-        filtro_fecha = "DATE(fecha_apertura) = CURRENT_DATE - INTERVAL '1 day'"
-    elif periodo == 'semana':
-        filtro_fecha = "fecha_apertura >= date_trunc('week', CURRENT_DATE)"
-    elif periodo == 'mes':
-        filtro_fecha = "fecha_apertura >= date_trunc('month', CURRENT_DATE)"
-    elif periodo == 'año' or periodo == 'ano':
-        filtro_fecha = "fecha_apertura >= date_trunc('year', CURRENT_DATE)"
-    else:
-        filtro_fecha = "fecha_apertura >= date_trunc('month', CURRENT_DATE)" # Por defecto
 
-    # 2. Armar la consulta SQL (Usamos COALESCE por si no hay ventas, que devuelva 0)
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             COALESCE(SUM(total_final), 0) AS ingresos,
             COUNT(id_pedido) AS ordenes
         FROM pedido
-        WHERE {filtro_fecha} AND estado_pago = 'PAGADO'
+        WHERE DATE(fecha_apertura) BETWEEN %s AND %s AND estado_pago = 'PAGADO'
     """
-    
+
     try:
-        cursor.execute(query)
+        cursor.execute(query, (fecha_inicio, fecha_fin))
         datos = cursor.fetchone()
-        
-        # 3. Procesar los resultados
+
         ingresos = float(datos['ingresos'])
         ordenes = int(datos['ordenes'])
         ticket_promedio = round(ingresos / ordenes, 2) if ordenes > 0 else 0.00
-        
+
         return {
             "ingresos": ingresos,
             "ordenes": ordenes,
@@ -55,39 +45,28 @@ def obtener_kpis(periodo: str = 'mes', db=Depends(get_db)):
         }
     except Exception as e:
         return {"error": str(e)}
-@router.get("/reportes/platos")
-def obtener_rendimiento_platos(periodo: str = 'mes', db=Depends(get_db)):
-    cursor = db.cursor(cursor_factory=RealDictCursor)
-    
-    # 1. El mismo filtro de tiempo
-    if periodo == 'hoy':
-        filtro_fecha = "DATE(ped.fecha_apertura) = CURRENT_DATE"
-    elif periodo == 'ayer':
-        filtro_fecha = "DATE(ped.fecha_apertura) = CURRENT_DATE - INTERVAL '1 day'"
-    elif periodo == 'semana':
-        filtro_fecha = "ped.fecha_apertura >= date_trunc('week', CURRENT_DATE)"
-    elif periodo == 'año' or periodo == 'ano':
-        filtro_fecha = "ped.fecha_apertura >= date_trunc('year', CURRENT_DATE)"
-    else:
-        filtro_fecha = "ped.fecha_apertura >= date_trunc('month', CURRENT_DATE)"
 
-    # 2. SQL Mágico para sacar el Top de Platos (Ingresos y Cantidad)
-    query = f"""
-        SELECT 
+@router.get("/reportes/platos")
+def obtener_rendimiento_platos(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)):
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+
+    # 🌟 Mismo rango de fechas que el resto del dashboard (ver nota en /reportes/kpis)
+    query = """
+        SELECT
             p.nombre,
             SUM(dp.cantidad) AS cantidad_vendida,
             COALESCE(SUM(dp.subtotal_calculado), SUM(dp.cantidad * p.precio_base)) AS ingresos_generados
         FROM detalle_pedido dp
         JOIN plato p ON dp.id_plato = p.id_plato
         JOIN pedido ped ON dp.id_pedido = ped.id_pedido
-        WHERE {filtro_fecha} AND ped.estado_pago = 'PAGADO'
+        WHERE DATE(ped.fecha_apertura) BETWEEN %s AND %s AND ped.estado_pago = 'PAGADO'
         GROUP BY p.id_plato, p.nombre
         ORDER BY ingresos_generados DESC
         LIMIT 10
     """
-    
+
     try:
-        cursor.execute(query)
+        cursor.execute(query, (fecha_inicio, fecha_fin))
         resultados = cursor.fetchall()
         
         # Separar los datos para enviarlos listos a los gráficos de React
@@ -105,33 +84,25 @@ def obtener_rendimiento_platos(periodo: str = 'mes', db=Depends(get_db)):
 
 
 @router.get("/reportes/operacion")
-def obtener_metricas_operacion(periodo: str = 'mes', db=Depends(get_db)):
+def obtener_metricas_operacion(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)):
     cursor = db.cursor(cursor_factory=RealDictCursor)
-    
-    # Filtro de tiempo
-    if periodo == 'hoy':
-        filtro_fecha = "DATE(ped.fecha_apertura) = CURRENT_DATE"
-    elif periodo == 'semana':
-        filtro_fecha = "ped.fecha_apertura >= date_trunc('week', CURRENT_DATE)"
-    else:
-        filtro_fecha = "ped.fecha_apertura >= date_trunc('month', CURRENT_DATE)"
 
     # SQL para sacar Pedidos por Hora y Tiempo Promedio de Espera
     # Usamos EXTRACT(EPOCH) para convertir la diferencia de fechas a segundos y lo dividimos para 60 (minutos)
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             EXTRACT(HOUR FROM ped.fecha_apertura) AS hora,
             COUNT(DISTINCT ped.id_pedido) AS total_pedidos,
             COALESCE(AVG(EXTRACT(EPOCH FROM (dp.fecha_entrega - dp.fecha_solicitud))/60), 0) AS tiempo_espera_min
         FROM pedido ped
         JOIN detalle_pedido dp ON ped.id_pedido = dp.id_pedido
-        WHERE {filtro_fecha} AND ped.estado_pago = 'PAGADO'
+        WHERE DATE(ped.fecha_apertura) BETWEEN %s AND %s AND ped.estado_pago = 'PAGADO'
         GROUP BY hora
         ORDER BY hora
     """
-    
+
     try:
-        cursor.execute(query)
+        cursor.execute(query, (fecha_inicio, fecha_fin))
         resultados = cursor.fetchall()
         
         labels = [f"{int(r['hora'])}h" for r in resultados]
@@ -159,51 +130,32 @@ def generar_analisis_ia(datos: DatosAnalisis):
     return {"analisis": analisis}
 
 @router.get("/reportes/evolucion")
-def obtener_evolucion_ventas(periodo: str = 'semana', db=Depends(get_db)):
+def obtener_evolucion_ventas(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)):
+    """
+    🌟 Simplificado para el controlador universal: en vez de cambiar la granularidad
+    (hora/día de semana/día de mes) según un 'periodo' predefinido, siempre agrupamos por
+    día calendario. Funciona igual de bien para "Hoy" (1 punto), "Esta Semana" (~7 puntos)
+    o un rango personalizado de varios meses (un punto por día con ventas).
+    """
     cursor = db.cursor(cursor_factory=RealDictCursor)
-    
-    # 1. Filtro y agrupación dinámica según el periodo
-    if periodo == 'hoy':
-        filtro_fecha = "DATE(fecha_apertura) = CURRENT_DATE"
-        agrupacion = "EXTRACT(HOUR FROM fecha_apertura)"
-    elif periodo == 'semana':
-        filtro_fecha = "fecha_apertura >= date_trunc('week', CURRENT_DATE)"
-        agrupacion = "EXTRACT(ISODOW FROM fecha_apertura)"
-    else: # mes
-        filtro_fecha = "fecha_apertura >= date_trunc('month', CURRENT_DATE)"
-        # agrupamos por el DÍA del mes (1 al 31)
-        agrupacion = "EXTRACT(DAY FROM fecha_apertura)"
 
-    query = f"""
-        SELECT 
-            {agrupacion} AS bloque_tiempo,
+    query = """
+        SELECT
+            DATE(fecha_apertura) AS dia,
             COALESCE(SUM(total_final), 0) AS ingresos
         FROM pedido
-        WHERE {filtro_fecha} AND estado_pago = 'PAGADO'
-        GROUP BY bloque_tiempo
-        ORDER BY bloque_tiempo
+        WHERE DATE(fecha_apertura) BETWEEN %s AND %s AND estado_pago = 'PAGADO'
+        GROUP BY DATE(fecha_apertura)
+        ORDER BY DATE(fecha_apertura) ASC
     """
-    
+
     try:
-        cursor.execute(query)
+        cursor.execute(query, (fecha_inicio, fecha_fin))
         resultados = cursor.fetchall()
-        
-        labels = []
-        data = []
-        dias_semana = {1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb', 7: 'Dom'}
-        
-        for r in resultados:
-            bloque = int(r['bloque_tiempo'])
-            if periodo == 'hoy':
-                labels.append(f"{bloque}h00")
-            elif periodo == 'semana':
-                labels.append(dias_semana.get(bloque, str(bloque)))
-            else:
-                # 👇 CAMBIO AQUÍ: Ahora la etiqueta dirá "Día 1", "Día 15", etc.
-                labels.append(f"Día {bloque}")
-                
-            data.append(float(r['ingresos']))
-            
+
+        labels = [r['dia'].strftime('%d/%m') for r in resultados]
+        data = [float(r['ingresos']) for r in resultados]
+
         return {"labels": labels, "data": data}
     except Exception as e:
         return {"error": str(e)}
@@ -325,24 +277,25 @@ def obtener_ventas_periodo(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)
         return {"error": str(e)}
 
 @router.get("/reportes/heatmap")
-def obtener_heatmap_operacion(db=Depends(get_db)):
-    # El Heatmap casi siempre analiza datos históricos grandes (ej. el último mes)
+def obtener_heatmap_operacion(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)):
+    """🌟 Antes analizaba un rango fijo de 30 días (hardcodeado, ignoraba cualquier filtro
+    del dashboard). Ahora respeta el mismo rango que el resto de /reportes/*."""
     cursor = db.cursor(cursor_factory=RealDictCursor)
-    
+
     query = """
-        SELECT 
+        SELECT
             EXTRACT(ISODOW FROM fecha_apertura) AS dia_semana,
             EXTRACT(HOUR FROM fecha_apertura) AS hora,
             COUNT(id_pedido) AS cantidad_pedidos
         FROM pedido
-        WHERE fecha_apertura >= CURRENT_DATE - INTERVAL '30 days'
+        WHERE DATE(fecha_apertura) BETWEEN %s AND %s
         GROUP BY dia_semana, hora
     """
-    
+
     try:
-        cursor.execute(query)
+        cursor.execute(query, (fecha_inicio, fecha_fin))
         resultados = cursor.fetchall()
-        
+
         # Devolveremos los datos crudos, el frontend se encargará de pintarlos
         return resultados
     except Exception as e:

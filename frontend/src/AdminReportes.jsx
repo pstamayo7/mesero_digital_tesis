@@ -25,20 +25,49 @@ const formatearFechaDisplay = (fechaISO) => {
   return `${dia}/${mes}/${año}`;
 };
 
+// Lunes de la semana que contiene `fecha` (si `fecha` es domingo, retrocede 6 días).
+const calcularLunesDeEstaSemana = (fecha) => {
+  const diaSemana = fecha.getDay(); // 0=domingo, 1=lunes, ..., 6=sábado
+  const diferencia = diaSemana === 0 ? 6 : diaSemana - 1;
+  const lunes = new Date(fecha);
+  lunes.setDate(fecha.getDate() - diferencia);
+  return lunes;
+};
+
 export default function AdminReportes() {
-  const [periodo, setPeriodo] = useState('mes');
   const [subPagina, setSubPagina] = useState('resumen');
 
   const [cargandoIA, setCargandoIA] = useState(false);
   const [analisisIA, setAnalisisIA] = useState(null);
 
-  // ================= HISTORIAL DE VENTAS POR RANGO DE FECHAS =================
+  // ================= 🌟 CONTROLADOR UNIVERSAL DE FECHAS =================
+  // Una sola fuente de verdad (fechaInicio/fechaFin) que alimenta TODOS los endpoints:
+  // KPIs, gráficos de platos/operación/evolución, mapa de calor y la tabla de acordeón.
   const hoy = new Date();
   const primerDiaDelMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const [filtroActivo, setFiltroActivo] = useState('MES'); // 'HOY' | 'SEMANA' | 'MES' | 'PERSONALIZADO'
   const [fechaInicio, setFechaInicio] = useState(formatearFechaLocal(primerDiaDelMes));
   const [fechaFin, setFechaFin] = useState(formatearFechaLocal(hoy));
+
+  const aplicarFiltroRapido = (tipo) => {
+    setFiltroActivo(tipo);
+    if (tipo === 'PERSONALIZADO') return; // conserva las fechas actuales; el usuario las edita a mano
+    const ahora = new Date();
+    if (tipo === 'HOY') {
+      const hoyStr = formatearFechaLocal(ahora);
+      setFechaInicio(hoyStr);
+      setFechaFin(hoyStr);
+    } else if (tipo === 'SEMANA') {
+      setFechaInicio(formatearFechaLocal(calcularLunesDeEstaSemana(ahora)));
+      setFechaFin(formatearFechaLocal(ahora));
+    } else if (tipo === 'MES') {
+      setFechaInicio(formatearFechaLocal(new Date(ahora.getFullYear(), ahora.getMonth(), 1)));
+      setFechaFin(formatearFechaLocal(ahora));
+    }
+  };
+
+  // ================= HISTORIAL DE VENTAS (Tarjetas KPI únicas + Acordeón) =================
   const [historial, setHistorial] = useState({ total_recaudado: 0, cantidad_pedidos: 0, ticket_promedio: 0, desglose_diario: [] });
-  const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
   // 🌟 ACORDEÓN DE 3 NIVELES: Día -> Órdenes -> Detalles.
   // Llaves: diasExpandidos[fecha] = bool, ordenesExpandidas[pedido_id] = bool.
@@ -53,51 +82,36 @@ export default function AdminReportes() {
     setOrdenesExpandidas(prev => ({ ...prev, [pedidoId]: !prev[pedidoId] }));
   };
 
-  const consultarHistorial = async () => {
-    setCargandoHistorial(true);
-    try {
-      const res = await fetch(`http://localhost:8000/admin/reportes/ventas-periodo?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
-      if (res.ok) {
-        const datos = await res.json();
-        setHistorial(datos);
-        // Cerramos cualquier acordeón abierto de una consulta anterior
-        setDiasExpandidos({});
-        setOrdenesExpandidas({});
-      }
-    } catch (error) {
-      console.error("Error cargando historial de ventas:", error);
-    } finally {
-      setCargandoHistorial(false);
-    }
-  };
-
-  // Carga inicial con el rango por defecto (1er día del mes -> hoy)
-  useEffect(() => { consultarHistorial(); }, []);
-
   // ================= ESTADOS PARA DATOS REALES (BACKEND) =================
-  const [kpis, setKpis] = useState({ ingresos: 0, ordenes: 0, ticket: 0 });
   const [datosPlatos, setDatosPlatos] = useState({ labels: [], ingresos: [], cantidades: [] });
   const [datosOperacion, setDatosOperacion] = useState({ labels: [], pedidos: [], tiempos: [] });
   const [datosEvolucion, setDatosEvolucion] = useState({ labels: [], data: [] });
   const [datosHeatmap, setDatosHeatmap] = useState([]);
 
-  // ================= UNIFICACIÓN Y CARGA DE DATOS DESDE LA DB =================
+  // ================= CARGA ÚNICA: TODOS los endpoints reaccionan al mismo rango =================
   useEffect(() => {
+    const qs = `fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`;
+
     const cargarDatos = async () => {
       try {
-        const resKpis = await fetch(`http://localhost:8000/admin/reportes/kpis?periodo=${periodo}`);
-        if (resKpis.ok) setKpis(await resKpis.json());
+        const resVentas = await fetch(`http://localhost:8000/admin/reportes/ventas-periodo?${qs}`);
+        if (resVentas.ok) {
+          setHistorial(await resVentas.json());
+          // Cerramos cualquier acordeón abierto de una consulta anterior
+          setDiasExpandidos({});
+          setOrdenesExpandidas({});
+        }
 
-        const resPlatos = await fetch(`http://localhost:8000/admin/reportes/platos?periodo=${periodo}`);
+        const resPlatos = await fetch(`http://localhost:8000/admin/reportes/platos?${qs}`);
         if (resPlatos.ok) setDatosPlatos(await resPlatos.json());
 
-        const resOperacion = await fetch(`http://localhost:8000/admin/reportes/operacion?periodo=${periodo}`);
+        const resOperacion = await fetch(`http://localhost:8000/admin/reportes/operacion?${qs}`);
         if (resOperacion.ok) setDatosOperacion(await resOperacion.json());
 
-        const resEvolucion = await fetch(`http://localhost:8000/admin/reportes/evolucion?periodo=${periodo}`);
+        const resEvolucion = await fetch(`http://localhost:8000/admin/reportes/evolucion?${qs}`);
         if (resEvolucion.ok) setDatosEvolucion(await resEvolucion.json());
 
-        const resHeatmap = await fetch(`http://localhost:8000/admin/reportes/heatmap`);
+        const resHeatmap = await fetch(`http://localhost:8000/admin/reportes/heatmap?${qs}`);
         if (resHeatmap.ok) setDatosHeatmap(await resHeatmap.json());
 
       } catch (error) {
@@ -105,7 +119,7 @@ export default function AdminReportes() {
       }
     };
     cargarDatos();
-  }, [periodo]);
+  }, [fechaInicio, fechaFin]);
 
   // ================= ESTILOS =================
   const theme = {
@@ -199,10 +213,10 @@ export default function AdminReportes() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          kpis: kpis,
+          kpis: { ingresos: historial.total_recaudado, ordenes: historial.cantidad_pedidos, ticket: historial.ticket_promedio },
           platos: datosPlatos,
           operacion: datosOperacion,
-          periodo: periodo
+          periodo: `${formatearFechaDisplay(fechaInicio)} - ${formatearFechaDisplay(fechaFin)}`
         })
       });
 
@@ -223,16 +237,53 @@ export default function AdminReportes() {
   return (
     <div style={{ animation: 'fadeIn 0.5s', display: 'flex', flexDirection: 'column', gap: '20px', color: '#1e293b' }}>
 
-      {/* HEADER Y FILTROS TEMPORALES */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white', padding: '15px 25px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+      {/* 🌟 CONTROLADOR UNIVERSAL DE FECHAS: rige TODO el dashboard de abajo */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px',
+        backgroundColor: 'white', padding: '15px 25px', borderRadius: '12px', border: '1px solid #f1f5f9'
+      }}>
         <div>
           <h2 style={{ margin: '0 0 5px 0', fontSize: '22px' }}>Análisis de Datos</h2>
-          <span style={theme.textoGris}>Resumen del rendimiento (Conectado a la DB)</span>
+          <span style={theme.textoGris}>
+            Periodo: {formatearFechaDisplay(fechaInicio)} → {formatearFechaDisplay(fechaFin)}
+          </span>
         </div>
-        <div style={{ display: 'flex', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          {['Hoy', 'Ayer', 'Semana', 'Mes'].map(p => (
-            <button key={p} onClick={() => setPeriodo(p.toLowerCase())} style={{ padding: '8px 16px', border: 'none', background: periodo === p.toLowerCase() ? '#f59e0b' : 'transparent', color: periodo === p.toLowerCase() ? 'white' : '#64748b', fontWeight: '600', cursor: 'pointer' }}>{p}</button>
-          ))}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            {[['HOY', 'Hoy'], ['SEMANA', 'Esta Semana'], ['MES', 'Este Mes'], ['PERSONALIZADO', 'Personalizado']].map(([clave, etiqueta]) => (
+              <button
+                key={clave}
+                onClick={() => aplicarFiltroRapido(clave)}
+                style={{
+                  padding: '8px 16px', border: 'none',
+                  background: filtroActivo === clave ? '#f59e0b' : 'transparent',
+                  color: filtroActivo === clave ? 'white' : '#64748b',
+                  fontWeight: '600', cursor: 'pointer', fontSize: '14px'
+                }}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
+
+          {filtroActivo === 'PERSONALIZADO' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="date"
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+                style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '13px' }}
+              />
+              <span style={{ color: '#94a3b8' }}>→</span>
+              <input
+                type="date"
+                value={fechaFin}
+                onChange={(e) => setFechaFin(e.target.value)}
+                style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '13px' }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -244,21 +295,23 @@ export default function AdminReportes() {
         <button style={theme.subNavItem(subPagina === 'historial')} onClick={() => setSubPagina('historial')}>📅 Historial de Ventas</button>
       </div>
 
-      {/* TARJETAS DE KPIs (DATOS REALES) */}
+      {/* 🌟 ÚNICO set de Tarjetas KPI (antes había dos: una fija a "MES" y otra del
+          filtro de la tabla). Ambas leían/escribían cosas distintas; ahora las dos
+          se alimentan del mismo /reportes/ventas-periodo y del mismo rango maestro. */}
       <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
         <div style={theme.kpiCard}>
-          <span style={theme.textoGris}>INGRESOS TOTALES ({periodo.toUpperCase()})</span>
-          <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#10b981' }}>{formatearDinero(kpis. ingresos)}</h2>
+          <span style={theme.textoGris}>💰 TOTAL FACTURADO</span>
+          <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#10b981' }}>{formatearDinero(historial.total_recaudado)}</h2>
           <div style={{ height: '40px', marginTop: '10px' }}><Line data={getSparkline('#10b981', [10, 25, 20, 45, 30, 50, 60])} options={miniLineOptions} /></div>
         </div>
         <div style={theme.kpiCard}>
-          <span style={theme.textoGris}>ÓRDENES TOTALES ({periodo.toUpperCase()})</span>
-          <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#3b82f6' }}>{kpis.ordenes}</h2>
+          <span style={theme.textoGris}>🧾 ÓRDENES TOTALES</span>
+          <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#3b82f6' }}>{historial.cantidad_pedidos} pedidos</h2>
           <div style={{ height: '40px', marginTop: '10px' }}><Line data={getSparkline('#3b82f6', [5, 10, 15, 12, 25, 20, 35])} options={miniLineOptions} /></div>
         </div>
         <div style={theme.kpiCard}>
-          <span style={theme.textoGris}>TICKET PROMEDIO ({periodo.toUpperCase()})</span>
-          <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#8b5cf6' }}>{formatearDinero(kpis.ticket)}</h2>
+          <span style={theme.textoGris}>🎟️ TICKET PROMEDIO</span>
+          <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#8b5cf6' }}>{formatearDinero(historial.ticket_promedio)}</h2>
           <div style={{ height: '40px', marginTop: '10px' }}><Line data={getSparkline('#8b5cf6', [10, 10.2, 10.5, 10.1, 10.6, 10.8, 10.7])} options={miniLineOptions} /></div>
         </div>
       </div>
@@ -347,57 +400,8 @@ export default function AdminReportes() {
           padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px'
         }}>
 
-          {/* ENCABEZADO DE FILTROS, separado visualmente de los resultados */}
-          <div style={{
-            backgroundColor: 'white', borderRadius: '10px', border: '1px solid #e2e8f0',
-            padding: '15px 20px', display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap'
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label style={theme.textoGris}>Fecha de Inicio</label>
-              <input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '14px' }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label style={theme.textoGris}>Fecha de Fin</label>
-              <input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '14px' }}
-              />
-            </div>
-            <button
-              onClick={consultarHistorial}
-              disabled={cargandoHistorial}
-              style={{
-                padding: '10px 24px', borderRadius: '6px', border: 'none',
-                backgroundColor: cargandoHistorial ? '#fcd34d' : '#f59e0b', color: 'white',
-                fontWeight: 'bold', cursor: cargandoHistorial ? 'not-allowed' : 'pointer', fontSize: '14px'
-              }}
-            >
-              {cargandoHistorial ? 'Consultando...' : '🔎 Filtrar Historial'}
-            </button>
-          </div>
-
-          {/* TARJETAS KPI DEL PERIODO FILTRADO */}
-          <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-            <div style={theme.kpiCard}>
-              <span style={theme.textoGris}>💰 TOTAL FACTURADO</span>
-              <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#10b981' }}>{formatearDinero(historial.total_recaudado)}</h2>
-            </div>
-            <div style={theme.kpiCard}>
-              <span style={theme.textoGris}>🧾 ÓRDENES TOTALES</span>
-              <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#3b82f6' }}>{historial.cantidad_pedidos} pedidos</h2>
-            </div>
-            <div style={theme.kpiCard}>
-              <span style={theme.textoGris}>🎟️ TICKET PROMEDIO</span>
-              <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#8b5cf6' }}>{formatearDinero(historial.ticket_promedio)}</h2>
-            </div>
-          </div>
+          {/* 🌟 Las fechas y las tarjetas KPI ya viven en el controlador maestro de arriba
+              (rigen todo el dashboard, no solo esta pestaña). Aquí solo queda el acordeón. */}
 
           {/* ACORDEÓN: NIVEL 1 (Día) -> NIVEL 2 (Órdenes) -> NIVEL 3 (Detalles) */}
           <div style={theme.card}>
