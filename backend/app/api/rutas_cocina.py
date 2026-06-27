@@ -152,7 +152,12 @@ def rechazar_plato(id_detalle: int):
 @router.post("/cocina/problema-item", tags=["Monitor de Cocina"])
 def reportar_problema_item(reporte: ReporteProblemaCocina):
     """
-    Manejo de crisis: el cocinero suspende un ítem por error humano o por falta de stock.
+    Manejo de crisis: el cocinero reporta un ítem con problema.
+    - ERROR_HUMANO / FALTA_STOCK -> estado_item = 'SUSPENDIDO' (incidente de cocina).
+    - CLIENTE_CANCELO -> estado_item = 'CANCELADO' (el cliente ya no lo quiere; no es
+      un fallo de cocina, así que se trata igual que un rechazo).
+    En ambos casos se sella 'fecha_actualizacion_estado' para que la Pantalla de Turnos
+    sepa exactamente cuándo mostrar/ocultar el aviso al cliente (ver TAREA 3).
     Si es FALTA_STOCK, además se pone el ingrediente reportado en stock_actual = 0 para
     que ia_service.py (validar_stock_carrito) y el Kiosko dejen de venderlo de inmediato.
     """
@@ -162,9 +167,15 @@ def reportar_problema_item(reporte: ReporteProblemaCocina):
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        nuevo_estado = "CANCELADO" if reporte.tipo_problema == "CLIENTE_CANCELO" else "SUSPENDIDO"
+
         cursor.execute(
-            "UPDATE Detalle_Pedido SET estado_item = 'SUSPENDIDO' WHERE id_detalle = %s;",
-            (reporte.item_pedido_id,)
+            """
+            UPDATE Detalle_Pedido
+            SET estado_item = %s, fecha_actualizacion_estado = CURRENT_TIMESTAMP
+            WHERE id_detalle = %s;
+            """,
+            (nuevo_estado, reporte.item_pedido_id)
         )
 
         if reporte.tipo_problema == "FALTA_STOCK" and reporte.ingrediente_agotado:
@@ -174,7 +185,7 @@ def reportar_problema_item(reporte: ReporteProblemaCocina):
             )
 
         conn.commit()
-        return {"mensaje": f"Ítem {reporte.item_pedido_id} suspendido."}
+        return {"mensaje": f"Ítem {reporte.item_pedido_id} marcado como {nuevo_estado}."}
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -210,9 +221,12 @@ def obtener_turnos_cliente():
         from psycopg2.extras import RealDictCursor
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        # 🛡️ TAREA 2: 'SUSPENDIDO' se excluye igual que 'CANCELADO' del cálculo del estado
+        # del pedido. Si no se excluyera, un ítem con problema nunca llegaría a 'ENTREGADO'
+        # y el pedido completo se quedaría estancado en 'PREPARANDO'/'EN_COLA' para siempre.
         query = """
-            SELECT 
-                pe.id_pedido, 
+            SELECT
+                pe.id_pedido,
                 pe.id_mesa,
                 pe.cliente_nombre, -- 🌟 AGREGAR ESTA LÍNEA
                 COUNT(dp.id_detalle) as total_items,
@@ -223,15 +237,15 @@ def obtener_turnos_cliente():
                 MAX(dp.fecha_entrega) as ultima_entrega
             FROM Pedido pe
             JOIN Detalle_Pedido dp ON pe.id_pedido = dp.id_pedido
-            WHERE dp.estado_item != 'CANCELADO' AND dp.fecha_solicitud >= CURRENT_DATE
+            WHERE dp.estado_item NOT IN ('CANCELADO', 'SUSPENDIDO') AND dp.fecha_solicitud >= CURRENT_DATE
             GROUP BY pe.id_pedido, pe.id_mesa, pe.cliente_nombre -- 🌟 AGREGAR AQUÍ
-            HAVING 
+            HAVING
                 COUNT(dp.id_detalle) > SUM(CASE WHEN dp.estado_item = 'ENTREGADO' THEN 1 ELSE 0 END)
                 OR MAX(dp.fecha_entrega) > (CURRENT_TIMESTAMP - INTERVAL '5 minutes');
         """
         cursor.execute(query)
         pedidos_db = cursor.fetchall()
-        
+
         turnos = []
         for p in pedidos_db:
             if p['total_items'] == p['items_entregados'] and p['total_items'] > 0:
@@ -240,17 +254,36 @@ def obtener_turnos_cliente():
                 estado = 'PREPARANDO'
             else:
                 estado = 'EN_COLA'
-                
+
             turnos.append({
                 "id_pedido": p['id_pedido'],
                 "id_mesa": p['id_mesa'],
-                "cliente_nombre": p['cliente_nombre'], 
+                "cliente_nombre": p['cliente_nombre'],
                 "estado": estado,
                 "fecha_inicio": p['fecha_inicio'],
                 "tiempo_asignado": p['tiempo_assigned']
             })
-            
-        return {"turnos": turnos}
+
+        # 🌟 TAREA 2: ítems con incidente (SUSPENDIDO/CANCELADO por el flujo de crisis del
+        # Monitor de Cocina), con la hora exacta del cambio para que PantallaTurnos.jsx
+        # decida cuándo dejar de mostrarlos (ventana de 60s, ver TAREA 3). El filtro de
+        # 2 minutos aquí es solo un margen de seguridad para no acumular incidentes viejos
+        # en la respuesta; el corte preciso de 60s vive en el frontend.
+        cursor.execute("""
+            SELECT
+                dp.id_detalle, dp.id_pedido, dp.cantidad, p.nombre AS plato_nombre,
+                dp.estado_item, dp.fecha_actualizacion_estado,
+                pe.id_mesa, pe.cliente_nombre
+            FROM Detalle_Pedido dp
+            JOIN Plato p ON dp.id_plato = p.id_plato
+            JOIN Pedido pe ON dp.id_pedido = pe.id_pedido
+            WHERE dp.estado_item IN ('SUSPENDIDO', 'CANCELADO')
+              AND dp.fecha_actualizacion_estado >= (CURRENT_TIMESTAMP - INTERVAL '2 minutes')
+            ORDER BY dp.fecha_actualizacion_estado DESC;
+        """)
+        items_problema = cursor.fetchall()
+
+        return {"turnos": turnos, "items_problema": items_problema}
     except Exception as e:
         print(f"❌ ERROR SQL EN PANTALLA TURNOS: {e}")
         raise HTTPException(status_code=500, detail="Error interno")

@@ -7,12 +7,72 @@ import ReactMarkdown from 'react-markdown';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, ChartTooltip, Legend, Filler);
 
+// 🌟 ANTI-UTC: formateamos fechas a "YYYY-MM-DD" leyendo año/mes/día LOCALES del objeto
+// Date (getFullYear/getMonth/getDate), nunca con .toISOString() (esa convierte a UTC y
+// puede mostrar el día anterior/siguiente según la zona horaria del navegador).
+const formatearFechaLocal = (fecha) => {
+  const año = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getDate()).padStart(2, '0');
+  return `${año}-${mes}-${dia}`;
+};
+
+// El backend ya devuelve "YYYY-MM-DD" (DATE de PostgreSQL, sin hora). Lo mostramos
+// recortando el string directamente, sin pasar por `new Date(...)` para no arriesgar
+// el mismo desfase de zona horaria al renderizar.
+const formatearFechaDisplay = (fechaISO) => {
+  const [año, mes, dia] = fechaISO.split('-');
+  return `${dia}/${mes}/${año}`;
+};
+
 export default function AdminReportes() {
   const [periodo, setPeriodo] = useState('mes');
   const [subPagina, setSubPagina] = useState('resumen');
-  
+
   const [cargandoIA, setCargandoIA] = useState(false);
   const [analisisIA, setAnalisisIA] = useState(null);
+
+  // ================= HISTORIAL DE VENTAS POR RANGO DE FECHAS =================
+  const hoy = new Date();
+  const primerDiaDelMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const [fechaInicio, setFechaInicio] = useState(formatearFechaLocal(primerDiaDelMes));
+  const [fechaFin, setFechaFin] = useState(formatearFechaLocal(hoy));
+  const [historial, setHistorial] = useState({ total_recaudado: 0, cantidad_pedidos: 0, ticket_promedio: 0, desglose_diario: [] });
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
+
+  // 🌟 ACORDEÓN DE 3 NIVELES: Día -> Órdenes -> Detalles.
+  // Llaves: diasExpandidos[fecha] = bool, ordenesExpandidas[pedido_id] = bool.
+  const [diasExpandidos, setDiasExpandidos] = useState({});
+  const [ordenesExpandidas, setOrdenesExpandidas] = useState({});
+
+  const alternarDia = (fecha) => {
+    setDiasExpandidos(prev => ({ ...prev, [fecha]: !prev[fecha] }));
+  };
+
+  const alternarOrden = (pedidoId) => {
+    setOrdenesExpandidas(prev => ({ ...prev, [pedidoId]: !prev[pedidoId] }));
+  };
+
+  const consultarHistorial = async () => {
+    setCargandoHistorial(true);
+    try {
+      const res = await fetch(`http://localhost:8000/admin/reportes/ventas-periodo?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
+      if (res.ok) {
+        const datos = await res.json();
+        setHistorial(datos);
+        // Cerramos cualquier acordeón abierto de una consulta anterior
+        setDiasExpandidos({});
+        setOrdenesExpandidas({});
+      }
+    } catch (error) {
+      console.error("Error cargando historial de ventas:", error);
+    } finally {
+      setCargandoHistorial(false);
+    }
+  };
+
+  // Carga inicial con el rango por defecto (1er día del mes -> hoy)
+  useEffect(() => { consultarHistorial(); }, []);
 
   // ================= ESTADOS PARA DATOS REALES (BACKEND) =================
   const [kpis, setKpis] = useState({ ingresos: 0, ordenes: 0, ticket: 0 });
@@ -181,6 +241,7 @@ export default function AdminReportes() {
         <button style={theme.subNavItem(subPagina === 'resumen')} onClick={() => setSubPagina('resumen')}>📊 Resumen Ejecutivo</button>
         <button style={theme.subNavItem(subPagina === 'menu')} onClick={() => setSubPagina('menu')}>🍔 Ventas y Menú</button>
         <button style={theme.subNavItem(subPagina === 'operacion')} onClick={() => setSubPagina('operacion')}>👨‍🍳 Operación y Cocina</button>
+        <button style={theme.subNavItem(subPagina === 'historial')} onClick={() => setSubPagina('historial')}>📅 Historial de Ventas</button>
       </div>
 
       {/* TARJETAS DE KPIs (DATOS REALES) */}
@@ -276,6 +337,158 @@ export default function AdminReportes() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ================= PÁGINA 4: HISTORIAL DE VENTAS (DRILL-DOWN DE 3 NIVELES) ================= */}
+      {subPagina === 'historial' && (
+        <section style={{
+          backgroundColor: '#f3f4f6', borderRadius: '12px', border: '1px solid #e2e8f0',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+          padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px'
+        }}>
+
+          {/* ENCABEZADO DE FILTROS, separado visualmente de los resultados */}
+          <div style={{
+            backgroundColor: 'white', borderRadius: '10px', border: '1px solid #e2e8f0',
+            padding: '15px 20px', display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label style={theme.textoGris}>Fecha de Inicio</label>
+              <input
+                type="date"
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '14px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label style={theme.textoGris}>Fecha de Fin</label>
+              <input
+                type="date"
+                value={fechaFin}
+                onChange={(e) => setFechaFin(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '14px' }}
+              />
+            </div>
+            <button
+              onClick={consultarHistorial}
+              disabled={cargandoHistorial}
+              style={{
+                padding: '10px 24px', borderRadius: '6px', border: 'none',
+                backgroundColor: cargandoHistorial ? '#fcd34d' : '#f59e0b', color: 'white',
+                fontWeight: 'bold', cursor: cargandoHistorial ? 'not-allowed' : 'pointer', fontSize: '14px'
+              }}
+            >
+              {cargandoHistorial ? 'Consultando...' : '🔎 Filtrar Historial'}
+            </button>
+          </div>
+
+          {/* TARJETAS KPI DEL PERIODO FILTRADO */}
+          <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+            <div style={theme.kpiCard}>
+              <span style={theme.textoGris}>💰 TOTAL FACTURADO</span>
+              <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#10b981' }}>{formatearDinero(historial.total_recaudado)}</h2>
+            </div>
+            <div style={theme.kpiCard}>
+              <span style={theme.textoGris}>🧾 ÓRDENES TOTALES</span>
+              <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#3b82f6' }}>{historial.cantidad_pedidos} pedidos</h2>
+            </div>
+            <div style={theme.kpiCard}>
+              <span style={theme.textoGris}>🎟️ TICKET PROMEDIO</span>
+              <h2 style={{ margin: '5px 0', fontSize: '28px', color: '#8b5cf6' }}>{formatearDinero(historial.ticket_promedio)}</h2>
+            </div>
+          </div>
+
+          {/* ACORDEÓN: NIVEL 1 (Día) -> NIVEL 2 (Órdenes) -> NIVEL 3 (Detalles) */}
+          <div style={theme.card}>
+            <h3 style={theme.tituloCard}>Desglose por Día (clic para ver las órdenes)</h3>
+
+            {historial.desglose_diario.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#9ca3af', padding: '20px 0' }}>
+                No hay ventas registradas en este rango de fechas.
+              </p>
+            ) : (
+              historial.desglose_diario.map((dia) => {
+                const diaAbierto = !!diasExpandidos[dia.fecha];
+                return (
+                  <div key={dia.fecha} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px', overflow: 'hidden' }}>
+
+                    {/* NIVEL 1: DÍA */}
+                    <div
+                      onClick={() => alternarDia(dia.fecha)}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '14px 16px', backgroundColor: '#f8fafc', cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ display: 'inline-block', transition: 'transform 0.2s', transform: diaAbierto ? 'rotate(90deg)' : 'rotate(0deg)', color: '#64748b' }}>▶</span>
+                        <strong style={{ fontSize: '15px' }}>{formatearFechaDisplay(dia.fecha)}</strong>
+                        <span style={{ color: '#64748b', fontSize: '13px' }}>({dia.pedidos_dia} pedidos)</span>
+                      </div>
+                      <strong style={{ color: '#10b981', fontSize: '16px' }}>{formatearDinero(dia.total_dia)}</strong>
+                    </div>
+
+                    {/* NIVEL 2: ÓRDENES DEL DÍA */}
+                    {diaAbierto && (
+                      <div style={{ backgroundColor: 'white', padding: '8px 16px' }}>
+                        {dia.ordenes.map((orden) => {
+                          const ordenAbierta = !!ordenesExpandidas[orden.pedido_id];
+                          return (
+                            <div key={orden.pedido_id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <div
+                                onClick={() => alternarOrden(orden.pedido_id)}
+                                style={{
+                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                  padding: '10px 8px', cursor: 'pointer'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <span style={{ display: 'inline-block', fontSize: '11px', transition: 'transform 0.2s', transform: ordenAbierta ? 'rotate(90deg)' : 'rotate(0deg)', color: '#94a3b8' }}>▶</span>
+                                  <span style={{ fontWeight: '600' }}>Pedido #{orden.pedido_id}</span>
+                                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>🕐 {orden.hora}</span>
+                                </div>
+                                <span style={{ fontWeight: 'bold', color: '#3b82f6' }}>{formatearDinero(orden.total_orden)}</span>
+                              </div>
+
+                              {/* NIVEL 3: DETALLES DEL PEDIDO */}
+                              {ordenAbierta && (
+                                <div style={{ padding: '4px 8px 14px 32px', backgroundColor: '#f8fafc', borderRadius: '6px', marginBottom: '8px' }}>
+                                  {orden.detalles.map((detalle, indice) => (
+                                    <div key={indice} style={{ padding: '8px 0', borderBottom: indice < orden.detalles.length - 1 ? '1px dashed #e2e8f0' : 'none' }}>
+                                      <span style={{ fontSize: '14px' }}><strong>{detalle.cantidad}x</strong> {detalle.plato}</span>
+                                      {detalle.modificaciones.length > 0 && (
+                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                                          {detalle.modificaciones.map((mod, i) => (
+                                            <span
+                                              key={i}
+                                              style={{
+                                                fontSize: '11px', fontStyle: 'italic', padding: '3px 9px', borderRadius: '10px',
+                                                backgroundColor: mod.tipo === 'EXTRA' ? '#dcfce7' : '#fee2e2',
+                                                color: mod.tipo === 'EXTRA' ? '#166534' : '#991b1b'
+                                              }}
+                                            >
+                                              {mod.tipo === 'EXTRA' ? '+' : '−'} {mod.ingrediente}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+        </section>
       )}
 
     </div>

@@ -58,9 +58,20 @@ function BarraProgreso({ fechaInicio, tiempoTotalMin }) {
     );
 }
 
+// 🌟 TAREA 3: mismo parche de zona horaria que ya usan TemporizadorPedido/BarraProgreso,
+// para poder comparar fecha_actualizacion_estado contra la hora local del navegador.
+function parsearFechaLocal(fechaStr) {
+    const fechaLimpia = fechaStr.replace('T', ' ').replace('Z', '').split('.')[0];
+    return new Date(fechaLimpia.replace(/-/g, '/'));
+}
+
+const VENTANA_INCIDENTE_MS = 60 * 1000; // El aviso de incidente dura 60s en pantalla
+
 // COMPONENTE PRINCIPAL DE LA PANTALLA
 function PantallaTurnos() {
     const [turnos, setTurnos] = useState([]);
+    const [itemsProblema, setItemsProblema] = useState([]);
+    const [ahora, setAhora] = useState(Date.now());
     const pedidosListosAnteriores = useRef(new Set());
 
     const cargarTurnos = () => {
@@ -82,6 +93,7 @@ function PantallaTurnos() {
 
                 pedidosListosAnteriores.current = listosActuales;
                 setTurnos(nuevosTurnos);
+                setItemsProblema(data.items_problema || []);
             })
             .catch(err => console.error("Error obteniendo turnos", err));
     };
@@ -92,9 +104,23 @@ function PantallaTurnos() {
         return () => clearInterval(intv);
     }, []);
 
+    // 🌟 TAREA 3: tick independiente del polling para que el incidente desaparezca de la
+    // pantalla a los 60s exactos, sin necesidad de esperar a la siguiente respuesta del backend.
+    useEffect(() => {
+        const intv = setInterval(() => setAhora(Date.now()), 5000);
+        return () => clearInterval(intv);
+    }, []);
+
     const enCola = turnos.filter(t => t.estado === 'EN_COLA');
     const preparando = turnos.filter(t => t.estado === 'PREPARANDO');
     const listos = turnos.filter(t => t.estado === 'LISTO');
+
+    // Solo los incidentes marcados hace menos de 60s; los demás se filtran y desaparecen.
+    const itemsProblemaVigentes = itemsProblema.filter(item => {
+        if (!item.fecha_actualizacion_estado) return false;
+        const marcadoEn = parsearFechaLocal(item.fecha_actualizacion_estado).getTime();
+        return (ahora - marcadoEn) <= VENTANA_INCIDENTE_MS;
+    });
 
     // Estilos en línea para hacerlo ultra portátil
     const colStyle = { flex: 1, padding: '20px', borderRadius: '12px', minHeight: '80vh' };
@@ -154,7 +180,25 @@ function PantallaTurnos() {
                             </p>
                         </div>
                     ))}
-                    {listos.length === 0 && <p style={{ textAlign: 'center', color: '#6ee7b7' }}>Esperando platos listos...</p>}
+
+                    {/* 🌟 TAREA 3: incidentes (SUSPENDIDO/CANCELADO) en diseño rojo de alerta,
+                        visibles solo durante 60s desde que el cocinero los reportó */}
+                    {itemsProblemaVigentes.map(item => (
+                        <div key={`problema-${item.id_detalle}`} style={{ ...cardStyle, backgroundColor: '#fee2e2', border: '2px solid #ef4444', color: '#991b1b' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.4rem' }}>{item.cantidad}x {item.plato_nombre}</h3>
+                            <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>
+                                {item.id_mesa === 0 ? `🛍️ Para: ${item.cliente_nombre}` : `🪑 Paleta: ${item.id_mesa}`}
+                            </p>
+                            <p style={{ margin: '10px 0 0 0', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                                {item.estado_item === 'CANCELADO' ? '❌ Cancelado' : '⚠️ Problema con el pedido'}
+                            </p>
+                            <p style={{ margin: '5px 0 0 0', fontSize: '0.85rem' }}>Por favor acércate a caja</p>
+                        </div>
+                    ))}
+
+                    {listos.length === 0 && itemsProblemaVigentes.length === 0 && (
+                        <p style={{ textAlign: 'center', color: '#6ee7b7' }}>Esperando platos listos...</p>
+                    )}
                 </div>
 
             </div>

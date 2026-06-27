@@ -30,7 +30,13 @@ function Caja() {
     }, []);
 
     const manejarCobro = async (id_pedido, id_mesa, total) => {
-        const confirmar = window.confirm(`¿Confirmas el pago de $${total} por el Pedido #${id_pedido}?`);
+        // 🌟 Mismo endpoint para cobrar o archivar: en ambos casos hay que cerrar el
+        // pedido y liberar la mesa en el backend. Solo cambia el mensaje de confirmación.
+        const pedidoAnulado = total <= 0;
+        const mensajeConfirmacion = pedidoAnulado
+            ? `Este pedido quedó en $0.00 (ítems cancelados/suspendidos). ¿Archivar el Pedido #${id_pedido} y liberar la mesa?`
+            : `¿Confirmas el pago de $${total} por el Pedido #${id_pedido}?`;
+        const confirmar = window.confirm(mensajeConfirmacion);
 
         if (confirmar) {
             try {
@@ -39,7 +45,8 @@ function Caja() {
                 });
 
                 if (respuesta.ok) {
-                    alert(`✅ ¡Pago registrado! ${id_mesa > 0 ? `La Paleta ${id_mesa} ha sido liberada.` : 'Pedido para llevar entregado.'}`);
+                    const mensajeExito = pedidoAnulado ? '🗂️ ¡Orden archivada!' : '✅ ¡Pago registrado!';
+                    alert(`${mensajeExito} ${id_mesa > 0 ? `La Paleta ${id_mesa} ha sido liberada.` : 'Pedido para llevar entregado.'}`);
                     cargarCuentas(); // Recargamos la lista para que desaparezca
                 } else {
                     alert("❌ Hubo un error al procesar el cobro.");
@@ -66,7 +73,7 @@ function Caja() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
           {cuentas.map(cuenta => {
             const esParaLlevar = cuenta.id_mesa === 0;
-            
+
             // 🌟 BLINDAJE: Si Postgres mandó el JSON como texto, lo convertimos a lista real
             let detallesArray = [];
             try {
@@ -74,6 +81,13 @@ function Caja() {
             } catch (e) {
               console.error("Error parseando detalle", e);
             }
+
+            // 🌟 ESTADO "ANULADO": si todos los ítems del pedido fueron suspendidos o
+            // cancelados en cocina, /caja/pendientes ya recalcula total_final en 0. Acá
+            // solo decidimos cómo se ve la tarjeta para que el cajero no confunda esto
+            // con un cobro real.
+            const totalNumerico = parseFloat(cuenta.total_final) || 0;
+            const pedidoAnulado = totalNumerico <= 0;
 
             return (
               <div key={cuenta.id_pedido} style={{ backgroundColor: 'white', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', borderTop: '5px solid #3b82f6' }}>
@@ -118,17 +132,23 @@ function Caja() {
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
-                  <span style={{ fontSize: '1.2rem', color: '#64748b' }}>Total a cobrar:</span>
-                  <span style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#10b981' }}>
-                    ${parseFloat(cuenta.total_final).toFixed(2)}
+                  <span style={{ fontSize: '1.2rem', color: '#64748b' }}>
+                    {pedidoAnulado ? 'Pedido anulado:' : 'Total a cobrar:'}
+                  </span>
+                  <span style={{ fontSize: '1.8rem', fontWeight: 'bold', color: pedidoAnulado ? '#6b7280' : '#10b981' }}>
+                    ${totalNumerico.toFixed(2)}
                   </span>
                 </div>
 
-                <button 
-                  onClick={() => manejarCobro(cuenta.id_pedido, cuenta.id_mesa, cuenta.total_final)}
-                  style={{ width: '100%', padding: '15px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer' }}
+                <button
+                  onClick={() => manejarCobro(cuenta.id_pedido, cuenta.id_mesa, totalNumerico)}
+                  style={{
+                    width: '100%', padding: '15px', border: 'none', borderRadius: '8px',
+                    fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+                    backgroundColor: pedidoAnulado ? '#4b5563' : '#10b981', color: 'white'
+                  }}
                 >
-                  💵 Cobrar y Liberar
+                  {pedidoAnulado ? '🗂️ Archivar Orden Cancelada' : '💵 Cobrar y Liberar'}
                 </button>
               </div>
             )

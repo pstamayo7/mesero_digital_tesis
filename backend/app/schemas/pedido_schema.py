@@ -142,7 +142,7 @@ class ReporteProblemaCocina(BaseModel):
     """Lo que manda el Monitor de Cocina cuando un cocinero suspende un ítem por error
     humano o por falta de stock (ver rutas_cocina.py: POST /cocina/problema-item)."""
     item_pedido_id: int
-    tipo_problema: Literal["ERROR_HUMANO", "FALTA_STOCK"]
+    tipo_problema: Literal["ERROR_HUMANO", "FALTA_STOCK", "CLIENTE_CANCELO"]
     ingrediente_agotado: Optional[str] = None
 
     @field_validator("ingrediente_agotado")

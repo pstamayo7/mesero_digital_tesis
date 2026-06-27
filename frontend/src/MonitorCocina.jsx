@@ -192,13 +192,15 @@ function MonitorCocina() {
         return
       }
 
-      // 🌟 TAREA 2: Actualizamos la tarjeta localmente (sin esperar al próximo polling de
-      // 4s). El render más abajo separa los ítems SUSPENDIDO en su propia sección de
-      // "Incidentes" para que no estorben la vista activa de preparación.
+      // 🌟 TAREA 1/2: Actualizamos la tarjeta localmente (sin esperar al próximo polling
+      // de 4s), reflejando el MISMO mapeo de estado que aplica el backend: CLIENTE_CANCELO
+      // -> CANCELADO, los demás -> SUSPENDIDO. El render más abajo separa ambos estados en
+      // la sección de "Incidentes" para que no estorben la vista activa de preparación.
+      const nuevoEstado = tipoProblema === 'CLIENTE_CANCELO' ? 'CANCELADO' : 'SUSPENDIDO'
       setComandas(prev => prev.map(comanda => ({
         ...comanda,
         items: comanda.items.map(item =>
-          item.id_detalle === itemReportando.id_detalle ? { ...item, estado_item: 'SUSPENDIDO' } : item
+          item.id_detalle === itemReportando.id_detalle ? { ...item, estado_item: nuevoEstado } : item
         )
       })))
 
@@ -234,9 +236,11 @@ function MonitorCocina() {
             // Verificamos si este pedido es el que toca atender obligatoriamente
             const esElTurno = comanda.id_pedido === idSiguienteTurno
 
-            // 🌟 TAREA 2: separamos los ítems suspendidos para que no estorben la cola activa.
-            const itemsActivos = comanda.items.filter(i => i.estado_item !== 'SUSPENDIDO')
-            const itemsSuspendidos = comanda.items.filter(i => i.estado_item === 'SUSPENDIDO')
+            // 🌟 TAREA 1/2: separamos los ítems con incidente (SUSPENDIDO o CANCELADO por el
+            // cocinero) para que no estorben la cola activa. El backend de /cocina/ordenes ya
+            // los excluye en el siguiente poll; esto solo cubre la ventana optimista local.
+            const itemsActivos = comanda.items.filter(i => i.estado_item !== 'SUSPENDIDO' && i.estado_item !== 'CANCELADO')
+            const itemsProblema = comanda.items.filter(i => i.estado_item === 'SUSPENDIDO' || i.estado_item === 'CANCELADO')
 
             return (
               <div key={comanda.id_pedido} className="comanda-tarjeta">
@@ -306,11 +310,11 @@ function MonitorCocina() {
                   ))}
                 </div>
 
-                {/* 🌟 TAREA 2: sección separada de incidentes, fuera de la vista activa */}
-                {itemsSuspendidos.length > 0 && (
+                {/* 🌟 TAREA 1/2: sección separada de incidentes, fuera de la vista activa */}
+                {itemsProblema.length > 0 && (
                   <div className="comanda-incidentes" style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #d1d5db' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#991b1b' }}>🚫 Incidentes</span>
-                    {itemsSuspendidos.map((item) => (
+                    {itemsProblema.map((item) => (
                       <div key={item.id_detalle} className="item-fila" style={{ opacity: 0.7 }}>
                         <div className="item-info">
                           <span className="item-nombre" style={{ textDecoration: 'line-through', color: '#9ca3af' }}>
@@ -320,7 +324,7 @@ function MonitorCocina() {
                             backgroundColor: '#991b1b', color: 'white', fontSize: '0.7rem',
                             fontWeight: 'bold', padding: '2px 8px', borderRadius: '10px', marginLeft: '8px'
                           }}>
-                            SUSPENDIDO
+                            {item.estado_item}
                           </span>
                         </div>
                       </div>
@@ -367,6 +371,15 @@ function MonitorCocina() {
                   onChange={() => setTipoProblema('FALTA_STOCK')}
                 />
                 Falta de Stock
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="tipoProblema"
+                  checked={tipoProblema === 'CLIENTE_CANCELO'}
+                  onChange={() => setTipoProblema('CLIENTE_CANCELO')}
+                />
+                Cliente canceló el pedido
               </label>
             </div>
 
