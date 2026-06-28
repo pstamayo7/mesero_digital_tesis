@@ -27,6 +27,21 @@ function Kiosko() {
   const [extrasDisponibles, setExtrasDisponibles] = useState([]);
   const [itemEditando, setItemEditando] = useState(null); // { index, idPlato, precioBase } | null
 
+  // 🌟 MODAL DE DETALLE DE PLATO (solo lectura, no toca el carrito por sí solo)
+  const [platoViendoDetalle, setPlatoViendoDetalle] = useState(null);
+  const [ingredientesDetalle, setIngredientesDetalle] = useState([]);
+
+  useEffect(() => {
+    if (!platoViendoDetalle) {
+      setIngredientesDetalle([]);
+      return;
+    }
+    fetch(`http://127.0.0.1:8000/menu/${platoViendoDetalle.id_plato}/ingredientes`)
+      .then(res => res.json())
+      .then(data => setIngredientesDetalle(data.ingredientes_base || []))
+      .catch(err => console.error("Error cargando ingredientes del plato:", err));
+  }, [platoViendoDetalle]);
+
   useEffect(() => {
     fetch('http://127.0.0.1:8000/configuracion-kiosko')
       .then(res => res.json())
@@ -383,17 +398,17 @@ function Kiosko() {
   // =====================================================================
   if (pasoActual === 0) {
     return (
-      <div className="kiosko" style={{ textAlign: 'center', padding: '40px 20px', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <h1 style={{ fontSize: '3rem', marginBottom: '10px' }}>🥟 ¡Bienvenido a Doña Zita!</h1>
-        <h2 style={{ color: '#4b5563', marginBottom: '40px' }}>Por favor, selecciona tu número de paleta para comenzar:</h2>
+      <div className="kiosko pantalla-bienvenida" style={{ textAlign: 'center', padding: '40px 20px', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <h1 className="bienvenida-titulo">🥟 ¡Bienvenido a Doña Zita!</h1>
+        <h2 className="bienvenida-subtitulo">Por favor, selecciona tu <strong>número de paleta</strong> para comenzar:</h2>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '15px', maxWidth: '800px', margin: '0 auto 40px auto' }}>
+        <div className="grid-paletas" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '15px', maxWidth: '800px', margin: '0 auto 40px auto' }}>
           {mesasLibres.length > 0 ? (
             mesasLibres.map(mesa => (
               <button
                 key={mesa}
                 onClick={() => { setNumeroMesa(mesa); setEsParaLlevar(false); setPasoActual(1); }}
-                style={{ padding: '20px', fontSize: '1.5rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+                className="btn-paleta"
               >
                 {mesa}
               </button>
@@ -403,14 +418,14 @@ function Kiosko() {
           )}
         </div>
 
-        <hr style={{ maxWidth: '800px', width: '100%', margin: '0 auto 40px auto', borderColor: '#d1d5db' }} />
+        <hr className="divisor-bienvenida" style={{ maxWidth: '800px', width: '100%', margin: '0 auto 40px auto' }} />
 
-        <div style={{ backgroundColor: '#f3f4f6', padding: '30px', borderRadius: '12px', maxWidth: '700px', margin: '0 auto', width: '100%' }}>
-          <h3 style={{ margin: '0 0 20px 0', fontSize: '1.8rem', color: '#1f2937' }}>🛍️ ¿Pedido para llevar? Habla con nuestra Anfitriona</h3>
+        <div className="card-llevar" style={{ maxWidth: '700px', margin: '0 auto', width: '100%' }}>
+          <h3 style={{ margin: '0 0 20px 0', fontSize: '1.8rem' }}>🛍️ ¿Pedido para llevar? Habla con nuestra Anfitriona</h3>
 
           {/* CUADRO DE DIÁLOGO DE LA IA */}
           {mensajeAnfitriona && (
-            <div style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '15px', borderRadius: '8px', marginBottom: '20px', fontStyle: 'italic', fontWeight: 'bold' }}>
+            <div className="caja-anfitriona">
               🤖 IA: "{mensajeAnfitriona}"
             </div>
           )}
@@ -422,14 +437,16 @@ function Kiosko() {
               onMouseUp={detenerGrabacionBienvenida}
               onTouchStart={iniciarGrabacionBienvenida}
               onTouchEnd={detenerGrabacionBienvenida}
-              style={{ flex: 1, padding: '15px', fontSize: '1.2rem', backgroundColor: grabandoNombre ? '#ef4444' : '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+              className={`btn-microfono ${grabandoNombre ? 'grabando' : ''}`}
+              style={{ flex: 1, fontSize: '1.1rem' }}
             >
               {grabandoNombre ? "👂 Te escucho (Suelta para enviar)..." : "🎙️ Mantén presionado para hablar"}
             </button>
 
             <button
               onClick={() => setMostrarTeclado(!mostrarTeclado)}
-              style={{ flex: 1, padding: '15px', fontSize: '1.2rem', backgroundColor: '#4b5563', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+              className="btn-secundario-outline"
+              style={{ flex: 1 }}
             >
               ⌨️ {mostrarTeclado ? "Ocultar Teclado" : "Escribir Manualmente"}
             </button>
@@ -440,24 +457,25 @@ function Kiosko() {
             readOnly
             placeholder="TU NOMBRE APARECERÁ AQUÍ"
             value={nombreCliente}
-            style={{ width: '90%', padding: '15px', fontSize: '1.5rem', borderRadius: '8px', border: '2px solid #3b82f6', marginBottom: '20px', textAlign: 'center', fontWeight: 'bold', backgroundColor: 'white' }}
+            className="input-nombre-bienvenida"
+            style={{ width: '90%', padding: '15px', fontSize: '1.5rem', marginBottom: '20px', textAlign: 'center', fontWeight: 'bold' }}
           />
 
           {/* TECLADO VIRTUAL */}
           {mostrarTeclado && (
-            <div style={{ backgroundColor: '#e5e7eb', padding: '15px', borderRadius: '10px', marginBottom: '20px' }}>
+            <div className="teclado-virtual">
               {tecladoFilas.map((fila, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'center', gap: '5px', marginBottom: '5px' }}>
                   {fila.map(tecla => (
-                    <button key={tecla} onClick={() => pulsarTecla(tecla)} style={{ padding: '15px 20px', fontSize: '1.2rem', fontWeight: 'bold', backgroundColor: 'white', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer' }}>
+                    <button key={tecla} onClick={() => pulsarTecla(tecla)} className="tecla-virtual">
                       {tecla}
                     </button>
                   ))}
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'center', gap: '5px' }}>
-                <button onClick={() => pulsarTecla('ESPACIO')} style={{ padding: '15px 40px', fontSize: '1.2rem', fontWeight: 'bold', backgroundColor: 'white', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', flex: 2 }}>ESPACIO</button>
-                <button onClick={() => pulsarTecla('BORRAR')} style={{ padding: '15px 20px', fontSize: '1.2rem', fontWeight: 'bold', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', flex: 1 }}>⌫ BORRAR</button>
+                <button onClick={() => pulsarTecla('ESPACIO')} className="tecla-virtual" style={{ padding: '15px 40px', flex: 2 }}>ESPACIO</button>
+                <button onClick={() => pulsarTecla('BORRAR')} className="tecla-virtual tecla-borrar" style={{ flex: 1 }}>⌫ BORRAR</button>
               </div>
             </div>
           )}
@@ -465,7 +483,7 @@ function Kiosko() {
           <button
             disabled={!nombreCliente.trim()}
             onClick={() => { setNumeroMesa(0); setEsParaLlevar(true); setPasoActual(1); setMensajeAnfitriona(""); }}
-            style={{ width: '100%', padding: '20px', fontSize: '1.5rem', backgroundColor: nombreCliente.trim() ? '#10b981' : '#9ca3af', color: 'white', border: 'none', borderRadius: '8px', cursor: nombreCliente.trim() ? 'pointer' : 'not-allowed', fontWeight: 'bold' }}
+            className={`btn-siguiente-paso ${nombreCliente.trim() ? 'btn-siguiente-activo' : ''}`}
           >
             Siguiente Paso ➡️
           </button>
@@ -477,19 +495,44 @@ function Kiosko() {
   // =====================================================================
   // 🌟 PANTALLA 1: EL KIOSKO NORMAL (Mantenida)
   // =====================================================================
+  const barrasOnda = [0, 1, 2, 3, 4];
+
+  // Helper puramente visual: elige un icono para el título de categoría según su nombre.
+  const iconoCategoria = (nombreCategoria) => {
+    const n = (nombreCategoria || "").toLowerCase();
+    if (n.includes("bebida") || n.includes("jugo") || n.includes("chicha")) return "🥤";
+    if (n.includes("postre") || n.includes("dulce")) return "🍮";
+    return "🍴";
+  };
+
   return (
     <div className="kiosko">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1e293b', color: 'white', padding: '15px 30px', borderRadius: '12px', marginBottom: '20px' }}>
-        <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🥟 Fritadas Doña Zita</h1>
-        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', backgroundColor: '#3b82f6', padding: '5px 15px', borderRadius: '8px' }}>
-          {esParaLlevar ? `🛍️ Llevar: ${nombreCliente}` : `🪑 Paleta: ${numeroMesa}`}
+      <div className="kiosko-header">
+        <div className="header-brand">
+          <span className="header-mascota">🐷</span>
+          <div className="header-textos">
+            <h1>DOÑA ZITA</h1>
+            <p className="header-subtitulo">la fritada más deliciosa</p>
+          </div>
         </div>
-        <button onClick={() => { setPasoActual(0); setMostrarTeclado(false); setMensajeAnfitriona(""); }} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer' }}>
-          Cancelar
-        </button>
+        <div className="header-acciones">
+          <div className="header-badge">
+            🪑 {esParaLlevar ? `Llevar: ${nombreCliente}` : `Paleta: ${numeroMesa}`}
+          </div>
+          <button
+            onClick={() => { setPasoActual(0); setMostrarTeclado(false); setMensajeAnfitriona(""); }}
+            className="btn-carrito-icon"
+            title="Cancelar"
+          >
+            🛒
+          </button>
+        </div>
       </div>
 
       <div className="zona-microfono">
+        <div className="onda-audio" aria-hidden="true">
+          {barrasOnda.map(i => <span key={`izq-${i}`} className="onda-barra" />)}
+        </div>
         <button
           className={`btn-microfono ${grabando ? 'grabando' : ''}`}
           onMouseDown={iniciarGrabacion}
@@ -497,8 +540,12 @@ function Kiosko() {
           onTouchStart={iniciarGrabacion}
           onTouchEnd={detenerGrabacion}
         >
-          {grabando ? "🎙️ Escuchando... (Suelta para enviar)" : "🎤 Mantén presionado para pedir"}
+          <span className="btn-microfono-icono">{grabando ? "🎙️" : "🎤"}</span>
+          {grabando ? "Escuchando... (Suelta para enviar)" : "Mantén presionado para pedir"}
         </button>
+        <div className="onda-audio" aria-hidden="true">
+          {barrasOnda.map(i => <span key={`der-${i}`} className="onda-barra" />)}
+        </div>
       </div>
 
       {transcripcion && (
@@ -611,89 +658,72 @@ function Kiosko() {
         <p className="mensaje-carga">Encendiendo los fogones (Cargando menú)...</p>
       ) : (
         <div className="menu-contenedor">
-          {menu.map((categoria) => (
-            <div key={categoria.id_categoria} className="categoria">
-              <h2>{categoria.nombre}</h2>
-              <div className="platos-grid">
-                {categoria.platos.map((plato) => {
-                  const disponible = plato.disponible !== false; // por defecto disponible si el backend no manda el campo
-                  return (
-                    <div
-                      key={plato.id_plato}
-                      className="tarjeta-plato"
-                      style={{
-                        cursor: disponible ? 'pointer' : 'not-allowed',
-                        opacity: disponible ? 1 : 0.85,
-                        transition: 'transform 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => { if (disponible) e.currentTarget.style.transform = 'scale(1.02)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                    >
-                      <div style={{ position: 'relative' }}>
-                        <img
-                          src={`http://127.0.0.1:8000${plato.ruta_imagen || '/imagenes/default.png'}`}
-                          alt={plato.nombre}
-                          style={{
-                            width: '100%',
-                            height: '180px',
-                            objectFit: 'cover',
-                            borderRadius: '8px 8px 0 0',
-                            marginBottom: '10px',
-                            filter: disponible ? 'none' : 'grayscale(100%)'
-                          }}
-                        />
-                        {!disponible && (
-                          <div style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                            borderRadius: '8px 8px 0 0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <span style={{
-                              backgroundColor: '#374151',
-                              color: 'white',
-                              fontWeight: 'bold',
-                              padding: '8px 16px',
-                              borderRadius: '20px',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                              fontSize: '0.95rem',
-                              textAlign: 'center'
-                            }}>
-                              🚫 Agotado por el momento
-                            </span>
+          {menu.map((categoria) => {
+            const esCategoriaCompacta = categoria.platos.length === 1;
+            return (
+              <div key={categoria.id_categoria} className="categoria">
+                <div className="categoria-header">
+                  <span className="categoria-icono">{iconoCategoria(categoria.nombre)}</span>
+                  <h2 className="categoria-titulo">{categoria.nombre}</h2>
+                </div>
+                <hr className="categoria-divisor" />
+                <div className={esCategoriaCompacta ? "platos-lista" : "platos-grid"}>
+                  {categoria.platos.map((plato) => {
+                    const disponible = plato.disponible !== false; // por defecto disponible si el backend no manda el campo
+                    return (
+                      <div
+                        key={plato.id_plato}
+                        className={`tarjeta-plato ${esCategoriaCompacta ? 'tarjeta-plato-horizontal' : ''} ${!disponible ? 'tarjeta-plato-agotada' : ''}`}
+                      >
+                        {/* 🌟 FASE 3: tocar la foto o el título abre el modal de detalle. El botón
+                            "Agregar +" tiene su propio onClick con stopPropagation para no disparar esto. */}
+                        <div
+                          className="tarjeta-plato-imagen-wrap"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setPlatoViendoDetalle(plato)}
+                        >
+                          <img
+                            src={`http://127.0.0.1:8000${plato.ruta_imagen || '/imagenes/default.png'}`}
+                            alt={plato.nombre}
+                            className="tarjeta-plato-imagen"
+                            style={{ filter: disponible ? 'none' : 'grayscale(100%)' }}
+                          />
+                          {!disponible && (
+                            <div className="overlay-agotado">
+                              <span className="badge-agotado">
+                                🚫 Agotado por el momento
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="tarjeta-plato-body">
+                          <h3 style={{ cursor: 'pointer' }} onClick={() => setPlatoViendoDetalle(plato)}>{plato.nombre}</h3>
+                          <p className="tarjeta-plato-tiempo">🕐 {plato.descripcion}</p>
+                          <div className="plato-footer">
+                            {disponible ? (
+                              <>
+                                <span className="precio">${plato.precio.toFixed(2)}</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); agregarAlCarrito(plato.nombre); }}
+                                  className="btn-agregar"
+                                >
+                                  Agregar +
+                                </button>
+                              </>
+                            ) : (
+                              <span className="texto-agotado">
+                                Agotado temporalmente
+                              </span>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
-                      <h3>{plato.nombre}</h3>
-                      <p>{plato.descripcion}</p>
-                      <div className="plato-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
-                        <span className="precio" style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>${plato.precio.toFixed(2)}</span>
-                        {disponible ? (
-                          <button
-                            onClick={() => agregarAlCarrito(plato.nombre)}
-                            className="btn-agregar"
-                            style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-                          >
-                            Agregar
-                          </button>
-                        ) : (
-                          <span style={{ color: '#ef4444', fontStyle: 'italic', fontSize: '0.95rem' }}>
-                            Agotado temporalmente, lo sentimos.
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -706,6 +736,53 @@ function Kiosko() {
           onGuardar={guardarEdicionPlato}
           onCerrar={() => setItemEditando(null)}
         />
+      )}
+
+      {/* 🌟 FASE 4: MODAL DE DETALLE DE PLATO (solo informativo + acceso rápido al carrito) */}
+      {platoViendoDetalle && (
+        <div className="modal-overlay" onClick={() => setPlatoViendoDetalle(null)}>
+          <div className="modal-detalle-plato" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-imagen-wrap">
+              <img
+                src={`http://127.0.0.1:8000${platoViendoDetalle.ruta_imagen || '/imagenes/default.png'}`}
+                alt={platoViendoDetalle.nombre}
+                className="modal-imagen"
+                style={{ filter: platoViendoDetalle.disponible === false ? 'grayscale(100%)' : 'none' }}
+              />
+              <button className="modal-cerrar" onClick={() => setPlatoViendoDetalle(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <h2 className="modal-titulo">{platoViendoDetalle.nombre}</h2>
+              <p className="tarjeta-plato-tiempo">🕐 {platoViendoDetalle.descripcion}</p>
+              <span className="modal-precio">${platoViendoDetalle.precio.toFixed(2)}</span>
+              <p className="modal-descripcion">
+                Preparado con ingredientes frescos al estilo tradicional de Doña Zita.
+              </p>
+
+              {ingredientesDetalle.length > 0 && (
+                <>
+                  <p className="modal-ingredientes-titulo">Ingredientes:</p>
+                  <div className="modal-ingredientes-lista">
+                    {ingredientesDetalle.map((ingrediente, i) => (
+                      <span key={i} className="modal-ingrediente-badge">{ingrediente}</span>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <button
+                className="modal-btn-agregar"
+                disabled={platoViendoDetalle.disponible === false}
+                onClick={() => {
+                  agregarAlCarrito(platoViendoDetalle.nombre);
+                  setPlatoViendoDetalle(null);
+                }}
+              >
+                {platoViendoDetalle.disponible === false ? 'Agotado por el momento' : 'Agregar al Carrito'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -8,10 +8,14 @@ export default function AdminDashboard() {
   const [config, setConfig] = useState({ max_platos_kiosko: 0, capacidad_paila_cocina: 0, cantidad_cocineros: 0, porcentaje_tiempo_extra: 0, total_paletas: 0 });
   const [ingredientes, setIngredientes] = useState([]);
   const [platos, setPlatos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
 
   // Estados para Modal de Recetas
   const [modalReceta, setModalReceta] = useState({ visible: false, plato: null, ingredientesReceta: [] });
   const [nuevoIngReceta, setNuevoIngReceta] = useState({ id_ingrediente: '', cantidad_base: 1 });
+
+  // Estado para el Modal de Edición de Plato
+  const [platoEditando, setPlatoEditando] = useState(null); // copia editable del plato, o null si está cerrado
 
   // Estados para los Formularios Elegantes (NUEVO)
   const [mostrarFormPlato, setMostrarFormPlato] = useState(false);
@@ -27,6 +31,7 @@ export default function AdminDashboard() {
     cargarConfiguracion();
     cargarIngredientes();
     cargarPlatos();
+    cargarCategorias();
   }, []);
 
   const mostrarMensaje = (texto) => {
@@ -68,6 +73,11 @@ export default function AdminDashboard() {
     if (res.ok) setPlatos(await res.json());
   };
 
+  const cargarCategorias = async () => {
+    const res = await fetch('http://localhost:8000/admin/categorias');
+    if (res.ok) setCategorias(await res.json());
+  };
+
   const guardarPlato = async (plato, esNuevo = false) => {
     // Saneamos espacios fantasma antes de que lleguen a PostgreSQL (rompen el cruce de nombres con el LLM)
     const platoSaneado = { ...plato, nombre: plato.nombre.trim() };
@@ -77,6 +87,30 @@ export default function AdminDashboard() {
     if (res.ok) {
       mostrarMensaje(esNuevo ? "✅ Plato creado" : "✅ Plato actualizado");
       cargarPlatos();
+    }
+  };
+
+  // ================= EDICIÓN Y BORRADO LÓGICO =================
+  const abrirEdicionPlato = (plato) => setPlatoEditando({ ...plato });
+
+  const guardarEdicionPlato = async () => {
+    await guardarPlato({
+      id_plato: platoEditando.id_plato,
+      id_categoria: parseInt(platoEditando.id_categoria),
+      nombre: platoEditando.nombre,
+      precio_base: parseFloat(platoEditando.precio_base),
+      requiere_coccion: platoEditando.requiere_coccion,
+      tiempo_prep_min: parseInt(platoEditando.tiempo_prep_min)
+    });
+    setPlatoEditando(null);
+  };
+
+  const eliminarPlato = async (plato) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar "${plato.nombre}" del menú?`)) return;
+    const res = await fetch(`http://localhost:8000/admin/platos/${plato.id_plato}`, { method: 'DELETE' });
+    if (res.ok) {
+      mostrarMensaje("🗑️ Plato eliminado del menú");
+      setPlatos(prev => prev.filter(p => p.id_plato !== plato.id_plato));
     }
   };
 
@@ -241,17 +275,26 @@ export default function AdminDashboard() {
           </div>
 
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={theme.th}>Plato</th><th style={theme.th}>Precio ($)</th><th style={theme.th}>Tiempo (min)</th><th style={theme.th}>Acciones</th></tr></thead>
+            <thead><tr><th style={theme.th}>Plato</th><th style={theme.th}>Categoría</th><th style={theme.th}>Precio ($)</th><th style={theme.th}>Tiempo (min)</th><th style={theme.th}>Acciones</th></tr></thead>
             <tbody>
               {platos.map(plato => (
                 <tr key={plato.id_plato}>
                   <td style={theme.td}><input style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={plato.nombre} onBlur={e => guardarPlato({...plato, nombre: e.target.value})} onFocus={e => e.target.style.border = '1px solid #cbd5e1'} /></td>
+                  <td style={theme.td}>{plato.categoria_nombre}</td>
                   <td style={theme.td}><input type="number" style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={plato.precio_base} onBlur={e => guardarPlato({...plato, precio_base: parseFloat(e.target.value)})} onFocus={e => e.target.style.border = '1px solid #cbd5e1'} /></td>
                   <td style={theme.td}><input type="number" style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={plato.tiempo_prep_min} onBlur={e => guardarPlato({...plato, tiempo_prep_min: parseInt(e.target.value)})} onFocus={e => e.target.style.border = '1px solid #cbd5e1'} /></td>
                   <td style={theme.td}>
-                    <button style={{...theme.btnSecondary, backgroundColor: '#fef08a', borderColor: '#fde047', color: '#854d0e'}} onClick={() => abrirReceta(plato)}>
-                      🍳 Ver Receta
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button style={{...theme.btnSecondary, backgroundColor: '#fef08a', borderColor: '#fde047', color: '#854d0e'}} onClick={() => abrirReceta(plato)}>
+                        🍳 Receta
+                      </button>
+                      <button style={{...theme.btnSecondary, backgroundColor: '#dbeafe', borderColor: '#bfdbfe', color: '#1d4ed8'}} onClick={() => abrirEdicionPlato(plato)} title="Editar plato">
+                        ✏️ Editar
+                      </button>
+                      <button style={{...theme.btnSecondary, backgroundColor: '#fee2e2', borderColor: '#fecaca', color: '#b91c1c'}} onClick={() => eliminarPlato(plato)} title="Eliminar plato">
+                        🗑️ Eliminar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -413,6 +456,78 @@ export default function AdminDashboard() {
           <button style={{...theme.btnSecondary, width: '100%', marginTop: '20px', padding: '12px'}} onClick={() => setModalReceta({ visible: false, plato: null, ingredientesReceta: [] })}>
             Cerrar Ventana
           </button>
+        </div>
+      </div>
+    )}
+
+    {/* ================= MODAL DE EDICIÓN DE PLATO ================= */}
+    {platoEditando && (
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' }}>
+        <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '420px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Editar Plato</h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold' }}>
+              Nombre
+              <input
+                style={{ ...theme.input, marginTop: '4px' }}
+                value={platoEditando.nombre}
+                onChange={e => setPlatoEditando({ ...platoEditando, nombre: e.target.value })}
+              />
+            </label>
+
+            <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold' }}>
+              Categoría
+              <select
+                style={{ ...theme.input, marginTop: '4px' }}
+                value={platoEditando.id_categoria}
+                onChange={e => setPlatoEditando({ ...platoEditando, id_categoria: e.target.value })}
+              >
+                {categorias.map(cat => (
+                  <option key={cat.id_categoria} value={cat.id_categoria}>{cat.nombre}</option>
+                ))}
+              </select>
+            </label>
+
+            <div style={{ display: 'flex', gap: '14px' }}>
+              <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold', flex: 1 }}>
+                Precio ($)
+                <input
+                  type="number" step="0.01"
+                  style={{ ...theme.input, marginTop: '4px' }}
+                  value={platoEditando.precio_base}
+                  onChange={e => setPlatoEditando({ ...platoEditando, precio_base: e.target.value })}
+                />
+              </label>
+              <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold', flex: 1 }}>
+                Tiempo (min)
+                <input
+                  type="number"
+                  style={{ ...theme.input, marginTop: '4px' }}
+                  value={platoEditando.tiempo_prep_min}
+                  onChange={e => setPlatoEditando({ ...platoEditando, tiempo_prep_min: e.target.value })}
+                />
+              </label>
+            </div>
+
+            <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="checkbox"
+                checked={!!platoEditando.requiere_coccion}
+                onChange={e => setPlatoEditando({ ...platoEditando, requiere_coccion: e.target.checked })}
+              />
+              Requiere cocción (entra a la cola de cocina)
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+            <button style={{...theme.btnPrimary, flex: 1, padding: '12px'}} onClick={guardarEdicionPlato}>
+              Guardar Cambios
+            </button>
+            <button style={{...theme.btnSecondary, flex: 1, padding: '12px'}} onClick={() => setPlatoEditando(null)}>
+              Cancelar
+            </button>
+          </div>
         </div>
       </div>
     )}

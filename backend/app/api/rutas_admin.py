@@ -102,16 +102,29 @@ def editar_ingrediente(id_ingrediente: int, ing: IngredienteBase, db=Depends(get
 # ==========================================
 # RUTAS DE MENÚ (PLATOS)
 # ==========================================
+@router.get("/categorias")
+def obtener_categorias(db=Depends(get_db)):
+    """Catálogo estricto de categorías ('Comida', 'Bebida', 'Porciones') para alimentar
+    el <select> del Dashboard. Viven en la tabla Categoria, no como texto libre en Plato."""
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT id_categoria, nombre FROM categoria ORDER BY id_categoria ASC;")
+    return cursor.fetchall()
+
 @router.get("/platos")
 def obtener_platos_admin(db=Depends(get_db)):
     cursor = db.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT p.*, c.nombre as categoria_nombre FROM plato p LEFT JOIN categoria c ON p.id_categoria = c.id_categoria ORDER BY c.nombre ASC, p.nombre ASC;")
+    cursor.execute("""
+        SELECT p.*, c.nombre as categoria_nombre
+        FROM plato p LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
+        WHERE p.activo = True
+        ORDER BY c.nombre ASC, p.nombre ASC;
+    """)
     return cursor.fetchall()
 
 @router.post("/platos")
 def crear_plato(plato: PlatoBase, db=Depends(get_db)):
     cursor = db.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("INSERT INTO plato (id_categoria, nombre, precio_base, requiere_coccion, tiempo_prep_min) VALUES (%s, %s, %s, %s, %s) RETURNING id_plato;", 
+    cursor.execute("INSERT INTO plato (id_categoria, nombre, precio_base, requiere_coccion, tiempo_prep_min) VALUES (%s, %s, %s, %s, %s) RETURNING id_plato;",
                    (plato.id_categoria, plato.nombre, plato.precio_base, plato.requiere_coccion, plato.tiempo_prep_min))
     id_nuevo = cursor.fetchone()['id_plato']
     db.commit()
@@ -120,16 +133,25 @@ def crear_plato(plato: PlatoBase, db=Depends(get_db)):
 @router.put("/platos/{id_plato}")
 def editar_plato(id_plato: int, plato: PlatoBase, db=Depends(get_db)):
     cursor = db.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("UPDATE plato SET nombre=%s, precio_base=%s, requiere_coccion=%s, tiempo_prep_min=%s WHERE id_plato=%s", 
-                   (plato.nombre, plato.precio_base, plato.requiere_coccion, plato.tiempo_prep_min, id_plato))
+    cursor.execute("UPDATE plato SET id_categoria=%s, nombre=%s, precio_base=%s, requiere_coccion=%s, tiempo_prep_min=%s WHERE id_plato=%s",
+                   (plato.id_categoria, plato.nombre, plato.precio_base, plato.requiere_coccion, plato.tiempo_prep_min, id_plato))
     db.commit()
     return {"mensaje": "Plato actualizado"}
+
+@router.delete("/platos/{id_plato}")
+def eliminar_plato(id_plato: int, db=Depends(get_db)):
+    """Borrado lógico: nunca un DELETE FROM, para no romper la integridad referencial
+    de pedidos históricos (detalle_pedido, receta) que ya apuntan a este id_plato."""
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("UPDATE plato SET activo = False WHERE id_plato = %s", (id_plato,))
+    db.commit()
+    return {"mensaje": "Plato eliminado del menú"}
 
 
 @router.get("/platos/todos")
 async def obtener_todos_los_platos(db = Depends(get_db)):
     cursor = db.cursor()
-    cursor.execute("SELECT id_plato, nombre, precio_base, ruta_imagen FROM plato ORDER BY id_plato")
+    cursor.execute("SELECT id_plato, nombre, precio_base, ruta_imagen FROM plato WHERE activo = True ORDER BY id_plato")
     filas = cursor.fetchall()
     
     # 🌟 CORRECCIÓN: Convertimos las tuplas crudas a diccionarios que React pueda entender

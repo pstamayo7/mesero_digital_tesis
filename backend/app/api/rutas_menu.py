@@ -29,6 +29,7 @@ def obtener_menu():
                    p.id_plato, p.nombre AS plato_nombre, p.precio_base, p.tiempo_prep_min, p.ruta_imagen
             FROM Categoria c
             JOIN Plato p ON c.id_categoria = p.id_categoria
+            WHERE p.activo = True
         """)
         filas = cursor.fetchall()
 

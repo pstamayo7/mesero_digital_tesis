@@ -96,7 +96,7 @@ def obtener_menu_disponible():
     try:
         conexion = get_db_connection()
         cursor = conexion.cursor()
-        cursor.execute("SELECT nombre FROM Plato;")
+        cursor.execute("SELECT nombre FROM Plato WHERE activo = True;")
         platos = cursor.fetchall()
         cursor.close()
         conexion.close()
@@ -123,7 +123,7 @@ def obtener_diccionario_precios():
         cursor = conexion.cursor()
 
         # Extraemos { "fritada tradicional": 5.00, "llapingachos": 3.50 }
-        cursor.execute("SELECT nombre, precio_base FROM Plato;")
+        cursor.execute("SELECT nombre, precio_base FROM Plato WHERE activo = True;")
         platos = {_normalizar(row[0]): float(row[1]) for row in cursor.fetchall()}
 
         # Extraemos { "mote": 0.50, "aguacate": 1.00 }

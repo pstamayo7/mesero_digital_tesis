@@ -1,13 +1,19 @@
+body {
+  background-color: #fdfbf7;
+  margin: 0;
+}
+
 .kiosko {
   max-width: 800px;
   margin: 0 auto;
   font-family: sans-serif;
-  color: #333;
+  color: #44403c;
+  background-color: #fdfbf7;
 }
 
 h1 {
   text-align: center;
-  color: #d35400;
+  color: #7f1d1d;
 }
 
 .categoria {
