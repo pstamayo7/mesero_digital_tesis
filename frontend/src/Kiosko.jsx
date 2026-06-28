@@ -540,7 +540,7 @@ function Kiosko() {
           </div>
           <button
             onClick={() => { setPasoActual(0); setMostrarTeclado(false); setMensajeAnfitriona(""); }}
-            className="w-11 h-11 rounded-full bg-red-950 text-white flex items-center justify-center shadow-md hover:bg-red-800 transition-colors"
+            className="w-11 h-11 rounded-full bg-red-950 text-white flex items-center justify-center shadow-md transition-all duration-150 ease-out transform-gpu active:scale-95 hover:bg-red-800"
             title="Cancelar"
           >
             🛒
@@ -549,16 +549,20 @@ function Kiosko() {
       </div>
 
       <div className="flex justify-center -mt-6 mb-8 px-4">
-        <button
-          className={`rounded-full px-14 py-6 text-white font-bold text-2xl shadow-lg shadow-red-900/40 transition-all duration-300 select-none ${grabando ? 'bg-red-600 animate-pulse' : 'bg-red-900 hover:bg-red-800'}`}
-          onMouseDown={iniciarGrabacion}
-          onMouseUp={detenerGrabacion}
-          onTouchStart={iniciarGrabacion}
-          onTouchEnd={detenerGrabacion}
-        >
-          <span className="mr-3 text-3xl align-middle">{grabando ? "🎙️" : "🎤"}</span>
-          {grabando ? "Escuchando... (Suelta para enviar)" : "Mantén presionado para pedir"}
-        </button>
+        <div className="relative">
+          <span className={`absolute inset-0 rounded-full bg-red-600 opacity-20 animate-ping duration-1000 ${grabando ? 'block' : 'hidden'}`} />
+          <span className="absolute inset-0 rounded-full bg-red-600 opacity-10 animate-pulse" />
+          <button
+            className={`relative rounded-full px-14 py-6 text-white font-bold text-2xl shadow-lg shadow-red-900/50 transition-all duration-100 ease-out select-none transform-gpu will-change-transform active:scale-95 hover:brightness-110 bg-gradient-to-r ${grabando ? 'from-red-600 to-red-800 animate-pulse' : 'from-red-700 to-red-900 hover:from-red-600 hover:to-red-800'}`}
+            onMouseDown={iniciarGrabacion}
+            onMouseUp={detenerGrabacion}
+            onTouchStart={iniciarGrabacion}
+            onTouchEnd={detenerGrabacion}
+          >
+            <span className="mr-3 text-3xl align-middle">{grabando ? "🎙️" : "🎤"}</span>
+            {grabando ? "Escuchando... (Suelta para enviar)" : "Mantén presionado para pedir"}
+          </button>
+        </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4">
@@ -687,7 +691,7 @@ function Kiosko() {
                     return (
                       <div
                         key={plato.id_plato}
-                        className={`bg-white rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden flex ${esCategoriaCompacta ? 'col-span-2 md:col-span-3 flex-row' : 'flex-col'}`}
+                        className={`bg-white rounded-2xl shadow-md transition-all duration-200 ease-out transform-gpu will-change-transform hover:-translate-y-1 hover:shadow-xl overflow-hidden flex ${esCategoriaCompacta ? 'col-span-2 md:col-span-3 flex-row' : 'flex-col'}`}
                       >
                         {/* 🌟 FASE 3: tocar la foto o el título abre el modal de detalle. El botón
                             "Agregar +" tiene su propio onClick con stopPropagation para no disparar esto. */}
@@ -717,7 +721,7 @@ function Kiosko() {
                                 <span className="text-red-700 font-bold text-xl">${plato.precio.toFixed(2)}</span>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); agregarAlCarrito(plato.nombre); }}
-                                  className="bg-red-900 text-white rounded-full px-4 py-1.5 text-sm font-semibold hover:bg-red-800 transition-colors"
+                                  className="bg-red-900 text-white rounded-full px-4 py-1.5 text-sm font-semibold transition-all duration-150 ease-out transform-gpu active:scale-95 hover:bg-red-800"
                                 >
                                   Agregar +
                                 </button>

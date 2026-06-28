@@ -243,24 +243,24 @@ function MonitorCocina() {
             const itemsProblema = comanda.items.filter(i => i.estado_item === 'SUSPENDIDO' || i.estado_item === 'CANCELADO')
 
             return (
-              <div key={comanda.id_pedido} className="comanda-tarjeta">
+              <div key={comanda.id_pedido} className={`comanda-tarjeta ${esElTurno ? 'comanda-tarjeta--turno' : ''}`}>
                 <div className="comanda-cabecera">
-                  <div className="comanda-cabecera">
+                  <div className="comanda-cabecera-fila">
                     <span className="pedido-titulo">Pedido #{comanda.id_pedido}</span>
                     <span className="mesa-titulo">
                       {comanda.id_mesa === 0 ? `🛍️ Llevar: ${comanda.cliente_nombre}` : `🪑 Paleta: ${comanda.id_mesa}`}
                     </span>
                   </div>
                   {comanda.fecha_inicio_global && (
-                    comanda.solo_bebidas ? (
-                      <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🥤 Despacho Inmediato</span>
-                    ) : (
-                      <TemporizadorPedido fechaInicio={comanda.fecha_inicio_global} tiempoPrep={comanda.tiempo_max_asignado} />
-                    )
+                    <div className="comanda-cabecera-estado">
+                      {comanda.solo_bebidas ? (
+                        <span className="badge-bebidas">🥤 Despacho Inmediato</span>
+                      ) : (
+                        <TemporizadorPedido fechaInicio={comanda.fecha_inicio_global} tiempoPrep={comanda.tiempo_max_asignado} />
+                      )}
+                    </div>
                   )}
                 </div>
-
-
 
                 <div className="comanda-items">
                   {itemsActivos.map((item) => (
@@ -278,14 +278,6 @@ function MonitorCocina() {
                             onClick={() => manejarRechazo(item.id_detalle)}
                             className="btn-accion rechazar"
                             disabled={!esElTurno}
-                            style={{
-                              opacity: esElTurno ? '1' : '0.5',
-                              padding: '4px 8px',
-                              fontSize: '0.75rem',
-                              maxWidth: '90px',
-                              backgroundColor: '#991b1b',
-                              marginLeft: 'auto' // Lo empuja a la derecha
-                            }}
                           >
                             ⚠️ Problema
                           </button>
@@ -299,7 +291,6 @@ function MonitorCocina() {
                             <button
                               onClick={() => abrirModalProblema(item.id_detalle, item.id_plato)}
                               className="btn-accion demorar"
-                              style={{ flex: '0.5', backgroundColor: '#b45309' }}
                             >
                               ⚠️ Reportar Problema
                             </button>
@@ -312,21 +303,16 @@ function MonitorCocina() {
 
                 {/* 🌟 TAREA 1/2: sección separada de incidentes, fuera de la vista activa */}
                 {itemsProblema.length > 0 && (
-                  <div className="comanda-incidentes" style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #d1d5db' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#991b1b' }}>🚫 Incidentes</span>
+                  <div className="comanda-incidentes">
+                    <span className="incidentes-titulo">🚫 Incidentes</span>
                     {itemsProblema.map((item) => (
-                      <div key={item.id_detalle} className="item-fila" style={{ opacity: 0.7 }}>
+                      <div key={item.id_detalle} className="item-fila item-fila--incidente">
                         <div className="item-info">
-                          <span className="item-nombre" style={{ textDecoration: 'line-through', color: '#9ca3af' }}>
+                          <span className="item-nombre item-nombre--cancelado">
                             <strong>{item.cantidad}x</strong> {item.plato_nombre}
                           </span>
-                          <span style={{
-                            backgroundColor: '#991b1b', color: 'white', fontSize: '0.7rem',
-                            fontWeight: 'bold', padding: '2px 8px', borderRadius: '10px', marginLeft: '8px'
-                          }}>
-                            {item.estado_item}
-                          </span>
                         </div>
+                        <span className="badge-incidente">{item.estado_item}</span>
                       </div>
                     ))}
                   </div>
@@ -338,23 +324,13 @@ function MonitorCocina() {
       )}
 
       {itemReportando !== null && (
-        <div
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', zIndex: 1000
-          }}
-          onClick={() => setItemReportando(null)}
-        >
-          <div
-            style={{ backgroundColor: 'white', color: '#1f2937', borderRadius: '12px', padding: '25px', maxWidth: '420px', width: '90%' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ marginTop: 0 }}>🚨 Reportar Problema</h2>
+        <div className="modal-sobrecapa" onClick={() => setItemReportando(null)}>
+          <div className="modal-contenido" onClick={(e) => e.stopPropagation()}>
+            <h2>🚨 Reportar Problema</h2>
             <p>¿Cuál es el problema con este plato?</p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <div className="modal-opciones">
+              <label className={`modal-opcion ${tipoProblema === 'ERROR_HUMANO' ? 'modal-opcion--activa' : ''}`}>
                 <input
                   type="radio"
                   name="tipoProblema"
@@ -363,7 +339,7 @@ function MonitorCocina() {
                 />
                 Accidente / Error en cocina
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <label className={`modal-opcion ${tipoProblema === 'FALTA_STOCK' ? 'modal-opcion--activa' : ''}`}>
                 <input
                   type="radio"
                   name="tipoProblema"
@@ -372,7 +348,7 @@ function MonitorCocina() {
                 />
                 Falta de Stock
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <label className={`modal-opcion ${tipoProblema === 'CLIENTE_CANCELO' ? 'modal-opcion--activa' : ''}`}>
                 <input
                   type="radio"
                   name="tipoProblema"
@@ -384,19 +360,17 @@ function MonitorCocina() {
             </div>
 
             {tipoProblema === 'FALTA_STOCK' && (
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold' }}>
-                  ¿Qué ingrediente se agotó?
-                </label>
+              <div className="modal-campo-extra">
+                <label>¿Qué ingrediente se agotó?</label>
                 {cargandoIngredientes ? (
-                  <p>Cargando receta del plato...</p>
+                  <p className="texto-ayuda">Cargando receta del plato...</p>
                 ) : ingredientesDelPlato.length === 0 ? (
-                  <p style={{ color: '#6b7280' }}>Este plato no tiene ingredientes base configurados.</p>
+                  <p className="texto-ayuda">Este plato no tiene ingredientes base configurados.</p>
                 ) : (
                   <select
                     value={ingredienteAgotado}
                     onChange={(e) => setIngredienteAgotado(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                    className="modal-select"
                   >
                     <option value="">-- Selecciona un ingrediente --</option>
                     {ingredientesDelPlato.map(ingrediente => (
@@ -407,22 +381,14 @@ function MonitorCocina() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={() => setItemReportando(null)}
-                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#6b7280', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
-              >
+            <div className="modal-botones">
+              <button onClick={() => setItemReportando(null)} className="btn-modal cancelar">
                 Cancelar
               </button>
               <button
                 onClick={confirmarProblema}
                 disabled={tipoProblema === 'FALTA_STOCK' && !ingredienteAgotado}
-                style={{
-                  flex: 1, padding: '12px', borderRadius: '8px', border: 'none',
-                  backgroundColor: (tipoProblema === 'FALTA_STOCK' && !ingredienteAgotado) ? '#9ca3af' : '#991b1b',
-                  color: 'white', fontWeight: 'bold',
-                  cursor: (tipoProblema === 'FALTA_STOCK' && !ingredienteAgotado) ? 'not-allowed' : 'pointer'
-                }}
+                className="btn-modal confirmar"
               >
                 Confirmar
               </button>
