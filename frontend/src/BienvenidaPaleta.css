@@ -1,0 +1,111 @@
+/* Estilos de la pantalla de Bienvenida / Selección de Paleta (paso 0 del Kiosko).
+   Construidos con @apply de Tailwind para mantener clases semánticas en el JSX
+   en vez de cadenas larguísimas de utilidades repetidas. */
+
+@tailwind components;
+
+@layer components {
+  .bienvenida-pantalla {
+    @apply min-h-screen bg-amber-50 flex flex-col items-center px-6 pb-10 text-center;
+  }
+
+  /* Encabezado de marca, consistente con el resto del Kiosko */
+  .bienvenida-header {
+    @apply w-full flex items-center justify-center gap-4 bg-red-900 text-white py-5 px-6 rounded-b-3xl shadow-lg mb-10;
+  }
+
+  .bienvenida-mascota {
+    @apply text-3xl bg-white rounded-full w-14 h-14 flex items-center justify-center shadow-md shrink-0;
+  }
+
+  .bienvenida-marca-titulo {
+    
+    @apply text-xl font-serif font-black tracking-wide m-0 text-yellow-400; 
+  }
+
+  .bienvenida-marca-subtitulo {
+    @apply text-amber-300 italic text-sm m-0;
+  }
+
+  .bienvenida-titulo {
+    @apply text-5xl font-serif font-black text-red-900 mb-3;
+  }
+
+  .bienvenida-subtitulo {
+    @apply text-stone-600 text-lg mb-10;
+  }
+
+  .grid-paletas {
+    @apply grid grid-cols-4 sm:grid-cols-5 gap-6 max-w-3xl w-full mb-10;
+  }
+
+  .btn-paleta {
+    @apply aspect-square rounded-3xl bg-white shadow-lg text-3xl font-bold text-red-900
+           flex items-center justify-center
+           hover:scale-105 hover:bg-red-900 hover:text-white hover:shadow-xl
+           transition-all duration-300;
+  }
+
+  .divisor-bienvenida {
+    @apply w-full max-w-3xl border-t-2 border-dotted border-amber-600/40 mb-10;
+  }
+
+  .card-llevar {
+    @apply bg-white rounded-3xl shadow-2xl p-10 max-w-2xl w-full flex flex-col items-center gap-6;
+  }
+
+  .card-llevar-titulo {
+    @apply text-2xl font-bold text-red-900 m-0;
+  }
+
+  .caja-anfitriona {
+    @apply w-full bg-amber-50 text-red-900 border border-amber-300 rounded-xl p-4 italic font-semibold;
+  }
+
+  .btn-voz-bienvenida {
+    @apply flex-1 rounded-full text-white text-lg font-bold py-5 shadow-lg
+           transition-all duration-300 select-none bg-red-800 hover:bg-red-900;
+  }
+
+  .btn-voz-bienvenida.grabando {
+    @apply bg-red-600 animate-pulse hover:bg-red-600;
+  }
+
+  .btn-teclado {
+    @apply flex-1 rounded-full bg-white border-2 border-red-800 text-red-800 text-lg font-bold
+           py-5 hover:bg-amber-50 transition-all duration-300;
+  }
+
+  .input-nombre-bienvenida {
+    @apply h-14 w-full rounded-xl bg-stone-100 border-2 border-stone-200 text-center text-xl
+           font-bold text-stone-700 px-4 outline-none focus:border-red-800 transition-colors;
+  }
+
+  .teclado-virtual {
+    @apply w-full bg-stone-100 rounded-2xl p-4 flex flex-col gap-2;
+  }
+
+  .tecla-virtual {
+    @apply px-5 py-4 text-lg font-bold bg-white border border-stone-300 rounded-lg text-stone-700
+           hover:border-amber-500 transition-colors;
+  }
+
+  .tecla-espacio {
+    @apply flex-[2] px-10 py-4 text-lg font-bold bg-white border border-stone-300 rounded-lg
+           text-stone-700 hover:border-amber-500 transition-colors;
+  }
+
+  .tecla-borrar {
+    @apply flex-1 px-5 py-4 text-lg font-bold bg-red-700 text-white rounded-lg hover:bg-red-800
+           transition-colors;
+  }
+
+  .btn-siguiente-paso {
+    @apply w-full h-16 rounded-2xl text-xl font-bold text-white transition-all duration-300
+           bg-stone-300 cursor-not-allowed;
+  }
+
+  .btn-siguiente-paso.activo {
+    @apply bg-amber-600 hover:bg-amber-700 shadow-lg cursor-pointer;
+  }
+}

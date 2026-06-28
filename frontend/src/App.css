@@ -33,14 +33,13 @@ h1 {
 }
 
 .header-mascota {
-  font-size: 2.4rem;
+  width: 110px;
+  height: 110px;
   background-color: #fdfbf7;
   border-radius: 50%;
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: cover;
+  padding: 5px;
+  box-sizing: border-box;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
   flex-shrink: 0;
 }
@@ -366,148 +365,6 @@ h1 {
   font-size: 1.2rem;
   color: #44403c;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-
-/* ===================== PANTALLA DE BIENVENIDA (PASO 0) ===================== */
-.bienvenida-titulo {
-  font-size: 2.6rem;
-  font-weight: 800;
-  color: #7f1d1d;
-  margin-bottom: 8px;
-}
-
-.bienvenida-subtitulo {
-  color: #44403c;
-  font-weight: normal;
-  font-size: 1.1rem;
-  margin-bottom: 40px;
-}
-
-.btn-paleta {
-  padding: 20px;
-  font-size: 1.4rem;
-  font-weight: bold;
-  background-color: #f5f0e6;
-  color: #7f1d1d;
-  border: 2px solid #7f1d1d;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-paleta:hover {
-  background-color: #7f1d1d;
-  color: #fdfbf7;
-  box-shadow: 0 8px 16px -4px rgba(127, 29, 29, 0.4);
-  transform: translateY(-2px);
-}
-
-.divisor-bienvenida {
-  border: none;
-  border-top: 2px dotted #d97706;
-  opacity: 0.6;
-}
-
-.card-llevar {
-  background-color: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
-  padding: 30px;
-}
-
-.card-llevar h3 {
-  color: #7f1d1d;
-}
-
-.caja-anfitriona {
-  background-color: #f5f0e6;
-  color: #7f1d1d;
-  padding: 15px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  font-style: italic;
-  font-weight: bold;
-  border: 1px solid #e7c9a3;
-}
-
-.btn-secundario-outline {
-  background-color: #fdfbf7;
-  color: #7f1d1d;
-  border: 2px solid #7f1d1d;
-  border-radius: 50px;
-  padding: 15px;
-  font-size: 1.1rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-secundario-outline:hover {
-  background-color: #f5f0e6;
-}
-
-.input-nombre-bienvenida {
-  border-radius: 10px;
-  border: 2px solid #e7e5e4;
-  background-color: white;
-  color: #44403c;
-  transition: border-color 0.2s ease;
-  outline: none;
-}
-
-.input-nombre-bienvenida:focus {
-  border-color: #7f1d1d;
-}
-
-.teclado-virtual {
-  background-color: #f5f0e6;
-  padding: 15px;
-  border-radius: 10px;
-  margin-bottom: 20px;
-}
-
-.tecla-virtual {
-  padding: 15px 20px;
-  font-size: 1.2rem;
-  font-weight: bold;
-  background-color: white;
-  border: 1px solid #e7c9a3;
-  border-radius: 6px;
-  cursor: pointer;
-  color: #44403c;
-}
-
-.tecla-virtual:hover {
-  border-color: #d97706;
-}
-
-.tecla-borrar {
-  background-color: #b91c1c;
-  color: white;
-  border: none;
-}
-
-.btn-siguiente-paso {
-  width: 100%;
-  padding: 20px;
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  background-color: #9ca3af;
-  cursor: not-allowed;
-  transition: all 0.2s ease;
-}
-
-.btn-siguiente-activo {
-  background-color: #d97706;
-  cursor: pointer;
-  box-shadow: 0 8px 16px -4px rgba(217, 119, 6, 0.4);
-}
-
-.btn-siguiente-activo:hover {
-  background-color: #b45309;
 }
 
 /* ===================== MODAL DE DETALLE DE PLATO ===================== */

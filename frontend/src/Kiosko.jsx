@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import './BienvenidaPaleta.css'
 import ModalEdicionPlato from './ModalEdicionPlato.jsx'
 
 function Kiosko() {
@@ -398,11 +399,25 @@ function Kiosko() {
   // =====================================================================
   if (pasoActual === 0) {
     return (
-      <div className="kiosko pantalla-bienvenida" style={{ textAlign: 'center', padding: '40px 20px', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <h1 className="bienvenida-titulo">🥟 ¡Bienvenido a Doña Zita!</h1>
-        <h2 className="bienvenida-subtitulo">Por favor, selecciona tu <strong>número de paleta</strong> para comenzar:</h2>
+      <div className="bienvenida-pantalla">
+        <div className="bienvenida-header">
+          <img
+            src="/logo.png"
+            alt="Logo Doña Zita"
+            className="w-28 h-28 object-cover rounded-full shadow-md shrink-0 bg-white p-1.5 box-border"
+          />
+          <div>
+            <h1 className="bienvenida-marca-titulo">DOÑA ZITA</h1>
+            <p className="bienvenida-marca-subtitulo">la fritada más deliciosa</p>
+          </div>
+        </div>
 
-        <div className="grid-paletas" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '15px', maxWidth: '800px', margin: '0 auto 40px auto' }}>
+        <h2 className="bienvenida-titulo">🥟 ¡Bienvenido a Doña Zita!</h2>
+        <h3 className="bienvenida-subtitulo">
+          Por favor, selecciona tu <strong>número de paleta</strong> para comenzar:
+        </h3>
+
+        <div className="grid-paletas">
           {mesasLibres.length > 0 ? (
             mesasLibres.map(mesa => (
               <button
@@ -414,14 +429,14 @@ function Kiosko() {
               </button>
             ))
           ) : (
-            <p style={{ gridColumn: '1 / -1', color: '#ef4444', fontWeight: 'bold' }}>Cargando paletas disponibles...</p>
+            <p className="col-span-full text-red-500 font-bold">Cargando paletas disponibles...</p>
           )}
         </div>
 
-        <hr className="divisor-bienvenida" style={{ maxWidth: '800px', width: '100%', margin: '0 auto 40px auto' }} />
+        <div className="divisor-bienvenida" />
 
-        <div className="card-llevar" style={{ maxWidth: '700px', margin: '0 auto', width: '100%' }}>
-          <h3 style={{ margin: '0 0 20px 0', fontSize: '1.8rem' }}>🛍️ ¿Pedido para llevar? Habla con nuestra Anfitriona</h3>
+        <div className="card-llevar">
+          <h3 className="card-llevar-titulo">🛍️ ¿Pedido para llevar? Habla con nuestra Anfitriona</h3>
 
           {/* CUADRO DE DIÁLOGO DE LA IA */}
           {mensajeAnfitriona && (
@@ -431,22 +446,20 @@ function Kiosko() {
           )}
 
           {/* BOTONES DE DICTADO Y TECLADO */}
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
+          <div className="flex gap-4 w-full">
             <button
               onMouseDown={iniciarGrabacionBienvenida}
               onMouseUp={detenerGrabacionBienvenida}
               onTouchStart={iniciarGrabacionBienvenida}
               onTouchEnd={detenerGrabacionBienvenida}
-              className={`btn-microfono ${grabandoNombre ? 'grabando' : ''}`}
-              style={{ flex: 1, fontSize: '1.1rem' }}
+              className={`btn-voz-bienvenida ${grabandoNombre ? 'grabando' : ''}`}
             >
               {grabandoNombre ? "👂 Te escucho (Suelta para enviar)..." : "🎙️ Mantén presionado para hablar"}
             </button>
 
             <button
               onClick={() => setMostrarTeclado(!mostrarTeclado)}
-              className="btn-secundario-outline"
-              style={{ flex: 1 }}
+              className="btn-teclado"
             >
               ⌨️ {mostrarTeclado ? "Ocultar Teclado" : "Escribir Manualmente"}
             </button>
@@ -458,24 +471,27 @@ function Kiosko() {
             placeholder="TU NOMBRE APARECERÁ AQUÍ"
             value={nombreCliente}
             className="input-nombre-bienvenida"
-            style={{ width: '90%', padding: '15px', fontSize: '1.5rem', marginBottom: '20px', textAlign: 'center', fontWeight: 'bold' }}
           />
 
           {/* TECLADO VIRTUAL */}
           {mostrarTeclado && (
             <div className="teclado-virtual">
               {tecladoFilas.map((fila, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'center', gap: '5px', marginBottom: '5px' }}>
+                <div key={i} className="flex justify-center gap-1">
                   {fila.map(tecla => (
-                    <button key={tecla} onClick={() => pulsarTecla(tecla)} className="tecla-virtual">
+                    <button
+                      key={tecla}
+                      onClick={() => pulsarTecla(tecla)}
+                      className="tecla-virtual"
+                    >
                       {tecla}
                     </button>
                   ))}
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '5px' }}>
-                <button onClick={() => pulsarTecla('ESPACIO')} className="tecla-virtual" style={{ padding: '15px 40px', flex: 2 }}>ESPACIO</button>
-                <button onClick={() => pulsarTecla('BORRAR')} className="tecla-virtual tecla-borrar" style={{ flex: 1 }}>⌫ BORRAR</button>
+              <div className="flex justify-center gap-1">
+                <button onClick={() => pulsarTecla('ESPACIO')} className="tecla-espacio">ESPACIO</button>
+                <button onClick={() => pulsarTecla('BORRAR')} className="tecla-borrar">⌫ BORRAR</button>
               </div>
             </div>
           )}
@@ -483,7 +499,7 @@ function Kiosko() {
           <button
             disabled={!nombreCliente.trim()}
             onClick={() => { setNumeroMesa(0); setEsParaLlevar(true); setPasoActual(1); setMensajeAnfitriona(""); }}
-            className={`btn-siguiente-paso ${nombreCliente.trim() ? 'btn-siguiente-activo' : ''}`}
+            className={`btn-siguiente-paso ${nombreCliente.trim() ? 'activo' : ''}`}
           >
             Siguiente Paso ➡️
           </button>
@@ -495,7 +511,6 @@ function Kiosko() {
   // =====================================================================
   // 🌟 PANTALLA 1: EL KIOSKO NORMAL (Mantenida)
   // =====================================================================
-  const barrasOnda = [0, 1, 2, 3, 4];
 
   // Helper puramente visual: elige un icono para el título de categoría según su nombre.
   const iconoCategoria = (nombreCategoria) => {
@@ -506,22 +521,26 @@ function Kiosko() {
   };
 
   return (
-    <div className="kiosko">
-      <div className="kiosko-header">
-        <div className="header-brand">
-          <span className="header-mascota">🐷</span>
-          <div className="header-textos">
-            <h1>DOÑA ZITA</h1>
-            <p className="header-subtitulo">la fritada más deliciosa</p>
+    <div className="bg-amber-50 min-h-screen pb-10">
+      <div className="bg-red-900 rounded-b-[3rem] shadow-xl px-6 pt-5 pb-9 flex items-center justify-between text-white">
+        <div className="flex items-center gap-3">
+          <img
+            src="/logo.png"
+            alt="Logo Doña Zita"
+            className="w-20 h-20 object-cover rounded-full bg-amber-50 p-1 shadow-md shrink-0"
+          />
+          <div>
+            <h1 className="text-xl md:text-2xl font-serif font-black tracking-wide m-0">DOÑA ZITA</h1>
+            <p className="text-amber-300 italic text-sm m-0">la fritada más deliciosa</p>
           </div>
         </div>
-        <div className="header-acciones">
-          <div className="header-badge">
+        <div className="flex items-center gap-3">
+          <div className="bg-amber-50 text-stone-800 font-bold rounded-full px-4 py-2 flex items-center gap-2 shadow-md whitespace-nowrap">
             🪑 {esParaLlevar ? `Llevar: ${nombreCliente}` : `Paleta: ${numeroMesa}`}
           </div>
           <button
             onClick={() => { setPasoActual(0); setMostrarTeclado(false); setMensajeAnfitriona(""); }}
-            className="btn-carrito-icon"
+            className="w-11 h-11 rounded-full bg-red-950 text-white flex items-center justify-center shadow-md hover:bg-red-800 transition-colors"
             title="Cancelar"
           >
             🛒
@@ -529,24 +548,20 @@ function Kiosko() {
         </div>
       </div>
 
-      <div className="zona-microfono">
-        <div className="onda-audio" aria-hidden="true">
-          {barrasOnda.map(i => <span key={`izq-${i}`} className="onda-barra" />)}
-        </div>
+      <div className="flex justify-center -mt-6 mb-8 px-4">
         <button
-          className={`btn-microfono ${grabando ? 'grabando' : ''}`}
+          className={`rounded-full px-14 py-6 text-white font-bold text-2xl shadow-lg shadow-red-900/40 transition-all duration-300 select-none ${grabando ? 'bg-red-600 animate-pulse' : 'bg-red-900 hover:bg-red-800'}`}
           onMouseDown={iniciarGrabacion}
           onMouseUp={detenerGrabacion}
           onTouchStart={iniciarGrabacion}
           onTouchEnd={detenerGrabacion}
         >
-          <span className="btn-microfono-icono">{grabando ? "🎙️" : "🎤"}</span>
+          <span className="mr-3 text-3xl align-middle">{grabando ? "🎙️" : "🎤"}</span>
           {grabando ? "Escuchando... (Suelta para enviar)" : "Mantén presionado para pedir"}
         </button>
-        <div className="onda-audio" aria-hidden="true">
-          {barrasOnda.map(i => <span key={`der-${i}`} className="onda-barra" />)}
-        </div>
       </div>
+
+      <div className="max-w-5xl mx-auto px-4">
 
       {transcripcion && (
         <div className="caja-transcripcion">
@@ -655,63 +670,60 @@ function Kiosko() {
       )}
 
       {cargando ? (
-        <p className="mensaje-carga">Encendiendo los fogones (Cargando menú)...</p>
+        <p className="text-center text-stone-500 text-lg py-10">Encendiendo los fogones (Cargando menú)...</p>
       ) : (
-        <div className="menu-contenedor">
+        <div>
           {menu.map((categoria) => {
             const esCategoriaCompacta = categoria.platos.length === 1;
             return (
-              <div key={categoria.id_categoria} className="categoria">
-                <div className="categoria-header">
-                  <span className="categoria-icono">{iconoCategoria(categoria.nombre)}</span>
-                  <h2 className="categoria-titulo">{categoria.nombre}</h2>
+              <div key={categoria.id_categoria} className="mt-8">
+                <div className="flex items-center gap-2 text-red-900 font-bold text-xl border-b-2 border-amber-600 w-max pb-1 mb-5">
+                  <span>{iconoCategoria(categoria.nombre)}</span>
+                  <h2 className="m-0 uppercase">{categoria.nombre}</h2>
                 </div>
-                <hr className="categoria-divisor" />
-                <div className={esCategoriaCompacta ? "platos-lista" : "platos-grid"}>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                   {categoria.platos.map((plato) => {
                     const disponible = plato.disponible !== false; // por defecto disponible si el backend no manda el campo
                     return (
                       <div
                         key={plato.id_plato}
-                        className={`tarjeta-plato ${esCategoriaCompacta ? 'tarjeta-plato-horizontal' : ''} ${!disponible ? 'tarjeta-plato-agotada' : ''}`}
+                        className={`bg-white rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden flex ${esCategoriaCompacta ? 'col-span-2 md:col-span-3 flex-row' : 'flex-col'}`}
                       >
                         {/* 🌟 FASE 3: tocar la foto o el título abre el modal de detalle. El botón
                             "Agregar +" tiene su propio onClick con stopPropagation para no disparar esto. */}
                         <div
-                          className="tarjeta-plato-imagen-wrap"
-                          style={{ cursor: 'pointer' }}
+                          className={`relative cursor-pointer shrink-0 ${esCategoriaCompacta ? 'w-1/3' : 'w-full'}`}
                           onClick={() => setPlatoViendoDetalle(plato)}
                         >
                           <img
                             src={`http://127.0.0.1:8000${plato.ruta_imagen || '/imagenes/default.png'}`}
                             alt={plato.nombre}
-                            className="tarjeta-plato-imagen"
-                            style={{ filter: disponible ? 'none' : 'grayscale(100%)' }}
+                            className={`object-cover ${esCategoriaCompacta ? 'w-full h-full' : 'w-full h-40'} ${disponible ? '' : 'grayscale'}`}
                           />
                           {!disponible && (
-                            <div className="overlay-agotado">
-                              <span className="badge-agotado">
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <span className="bg-stone-800 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md text-center">
                                 🚫 Agotado por el momento
                               </span>
                             </div>
                           )}
                         </div>
-                        <div className="tarjeta-plato-body">
-                          <h3 style={{ cursor: 'pointer' }} onClick={() => setPlatoViendoDetalle(plato)}>{plato.nombre}</h3>
-                          <p className="tarjeta-plato-tiempo">🕐 {plato.descripcion}</p>
-                          <div className="plato-footer">
+                        <div className="p-4 flex flex-col flex-1">
+                          <h3 className="text-lg font-bold text-stone-800 m-0 cursor-pointer" onClick={() => setPlatoViendoDetalle(plato)}>{plato.nombre}</h3>
+                          <p className="text-sm text-stone-500 mb-3">🕒 {plato.descripcion}</p>
+                          <div className="flex justify-between items-center mt-auto">
                             {disponible ? (
                               <>
-                                <span className="precio">${plato.precio.toFixed(2)}</span>
+                                <span className="text-red-700 font-bold text-xl">${plato.precio.toFixed(2)}</span>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); agregarAlCarrito(plato.nombre); }}
-                                  className="btn-agregar"
+                                  className="bg-red-900 text-white rounded-full px-4 py-1.5 text-sm font-semibold hover:bg-red-800 transition-colors"
                                 >
                                   Agregar +
                                 </button>
                               </>
                             ) : (
-                              <span className="texto-agotado">
+                              <span className="text-stone-500 italic text-sm">
                                 Agotado temporalmente
                               </span>
                             )}
@@ -726,6 +738,8 @@ function Kiosko() {
           })}
         </div>
       )}
+
+      </div>
 
       {itemEditando && (
         <ModalEdicionPlato
