@@ -216,7 +216,9 @@ export default function AdminReportes() {
           kpis: { ingresos: historial.total_recaudado, ordenes: historial.cantidad_pedidos, ticket: historial.ticket_promedio },
           platos: datosPlatos,
           operacion: datosOperacion,
-          periodo: `${formatearFechaDisplay(fechaInicio)} - ${formatearFechaDisplay(fechaFin)}`
+          periodo: `${formatearFechaDisplay(fechaInicio)} - ${formatearFechaDisplay(fechaFin)}`,
+          fecha_inicio: fechaInicio,
+          fecha_fin: fechaFin
         })
       });
 

@@ -1,3 +1,4 @@
+from collections import Counter, defaultdict
 from fastapi import APIRouter, Depends
 from psycopg2.extras import RealDictCursor
 from app.core.database import get_db
@@ -11,6 +12,8 @@ class DatosAnalisis(BaseModel):
     platos: dict
     operacion: dict
     periodo: str = "este periodo"
+    fecha_inicio: str
+    fecha_fin: str
 
 @router.get("/reportes/kpis")
 def obtener_kpis(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)):
@@ -117,15 +120,18 @@ def obtener_metricas_operacion(fecha_inicio: str, fecha_fin: str, db=Depends(get
     except Exception as e:
         return {"error": str(e)}
 @router.post("/reportes/generar-analisis-ia")
-def generar_analisis_ia(datos: DatosAnalisis):
-    # Asegúrate de importar generar_analisis_negocio arriba: 
-    # from app.services.ia_service import generar_analisis_negocio
-    
+def generar_analisis_ia(datos: DatosAnalisis, db=Depends(get_db)):
+    # 🌟 Consultor Predictivo: además de los KPIs/platos/operación que ya traía el front,
+    # extraemos las 5 señales "Enterprise" (combos, extras, cancelaciones, desviación de
+    # tiempos, inventario crítico) en el mismo rango de fechas para dárselas al LLM.
+    datos_avanzados = _obtener_datos_avanzados_negocio(datos.fecha_inicio, datos.fecha_fin, db)
+
     analisis = generar_analisis_negocio(
-        kpis=datos.kpis, 
-        platos=datos.platos, 
+        kpis=datos.kpis,
+        platos=datos.platos,
         operacion=datos.operacion,
-        periodo=datos.periodo
+        periodo=datos.periodo,
+        datos_avanzados=datos_avanzados
     )
     return {"analisis": analisis}
 
@@ -180,6 +186,138 @@ def _parsear_modificaciones(especificaciones_ia):
             tipo, ingrediente = trozos
             modificaciones.append({"tipo": tipo.strip().upper(), "ingrediente": ingrediente.strip()})
     return modificaciones
+
+def _obtener_datos_avanzados_negocio(fecha_inicio, fecha_fin, db):
+    """
+    🧠 Extracción de la data "Enterprise" que alimenta al Consultor Predictivo de IA
+    (ver ia_service.generar_analisis_negocio). Cinco señales agregadas, todas acotadas
+    al mismo rango de fechas que el resto del dashboard:
+    1. Combinaciones frecuentes (pares de platos vendidos juntos en la misma orden).
+    2. Extras más populares y a qué plato se añaden más (parseados de especificaciones_ia,
+       igual que en /reportes/ventas-periodo, porque 'modificacion_item' nunca se pobló).
+    3. Tasa de cancelación/suspensión por plato.
+    4. Desviación entre tiempo de cocción teórico (Plato.tiempo_prep_min) y real
+       (fecha_entrega - fecha_inicio_preparacion).
+    5. Inventario crítico: ingredientes con menos días de stock restante al ritmo de
+       consumo observado en el periodo (vía Receta, no incluye los extras sueltos).
+    """
+    cursor = db.cursor(cursor_factory=RealDictCursor)
+
+    # 1. COMBINACIONES FRECUENTES
+    cursor.execute("""
+        SELECT p1.nombre AS plato_1, p2.nombre AS plato_2, COUNT(*) AS veces_juntos
+        FROM Detalle_Pedido dp1
+        JOIN Detalle_Pedido dp2 ON dp1.id_pedido = dp2.id_pedido AND dp1.id_plato < dp2.id_plato
+        JOIN Plato p1 ON dp1.id_plato = p1.id_plato
+        JOIN Plato p2 ON dp2.id_plato = p2.id_plato
+        JOIN Pedido pe ON dp1.id_pedido = pe.id_pedido
+        WHERE pe.estado_pago = 'PAGADO'
+          AND DATE(pe.fecha_apertura) BETWEEN %s AND %s
+          AND dp1.estado_item NOT IN ('CANCELADO', 'SUSPENDIDO')
+          AND dp2.estado_item NOT IN ('CANCELADO', 'SUSPENDIDO')
+        GROUP BY p1.nombre, p2.nombre
+        ORDER BY veces_juntos DESC
+        LIMIT 5;
+    """, (fecha_inicio, fecha_fin))
+    combinaciones_frecuentes = cursor.fetchall()
+
+    # 2. EXTRAS POPULARES (parseo en Python: la fuente real es especificaciones_ia)
+    cursor.execute("""
+        SELECT dp.especificaciones_ia, p.nombre AS plato_nombre
+        FROM Detalle_Pedido dp
+        JOIN Plato p ON dp.id_plato = p.id_plato
+        JOIN Pedido pe ON dp.id_pedido = pe.id_pedido
+        WHERE DATE(pe.fecha_apertura) BETWEEN %s AND %s
+          AND dp.estado_item NOT IN ('CANCELADO', 'SUSPENDIDO')
+          AND dp.especificaciones_ia IS NOT NULL;
+    """, (fecha_inicio, fecha_fin))
+    conteo_extra = Counter()
+    conteo_extra_por_plato = defaultdict(Counter)
+    for fila in cursor.fetchall():
+        for mod in _parsear_modificaciones(fila["especificaciones_ia"]):
+            if mod["tipo"] == "EXTRA":
+                conteo_extra[mod["ingrediente"]] += 1
+                conteo_extra_por_plato[mod["ingrediente"]][fila["plato_nombre"]] += 1
+
+    extras_populares = []
+    for ingrediente, veces_pedido in conteo_extra.most_common(5):
+        plato_mas_frecuente, _ = conteo_extra_por_plato[ingrediente].most_common(1)[0]
+        extras_populares.append({
+            "ingrediente": ingrediente,
+            "veces_pedido": veces_pedido,
+            "plato_mas_frecuente": plato_mas_frecuente
+        })
+
+    # 3. TASA DE CANCELACIÓN/SUSPENSIÓN POR PLATO
+    cursor.execute("""
+        SELECT
+            p.nombre,
+            COUNT(*) FILTER (WHERE dp.estado_item IN ('CANCELADO', 'SUSPENDIDO')) AS items_caidos,
+            COUNT(*) AS items_totales,
+            ROUND(100.0 * COUNT(*) FILTER (WHERE dp.estado_item IN ('CANCELADO', 'SUSPENDIDO')) / COUNT(*), 1) AS tasa_caida_pct
+        FROM Detalle_Pedido dp
+        JOIN Plato p ON dp.id_plato = p.id_plato
+        JOIN Pedido pe ON dp.id_pedido = pe.id_pedido
+        WHERE DATE(pe.fecha_apertura) BETWEEN %s AND %s
+        GROUP BY p.nombre
+        HAVING COUNT(*) FILTER (WHERE dp.estado_item IN ('CANCELADO', 'SUSPENDIDO')) > 0
+        ORDER BY tasa_caida_pct DESC, items_caidos DESC
+        LIMIT 5;
+    """, (fecha_inicio, fecha_fin))
+    tasa_cancelacion = cursor.fetchall()
+
+    # 4. DESVIACIÓN DE TIEMPOS DE COCCIÓN (teórico vs. real)
+    cursor.execute("""
+        SELECT
+            p.nombre,
+            p.tiempo_prep_min AS tiempo_teorico_min,
+            ROUND(AVG(EXTRACT(EPOCH FROM (dp.fecha_entrega - dp.fecha_inicio_preparacion)) / 60), 1) AS tiempo_real_min,
+            ROUND(AVG(EXTRACT(EPOCH FROM (dp.fecha_entrega - dp.fecha_inicio_preparacion)) / 60) - p.tiempo_prep_min, 1) AS desviacion_min
+        FROM Detalle_Pedido dp
+        JOIN Plato p ON dp.id_plato = p.id_plato
+        JOIN Pedido pe ON dp.id_pedido = pe.id_pedido
+        WHERE DATE(pe.fecha_apertura) BETWEEN %s AND %s
+          AND dp.estado_item = 'ENTREGADO'
+          AND dp.fecha_entrega IS NOT NULL
+          AND dp.fecha_inicio_preparacion IS NOT NULL
+          AND p.requiere_coccion = TRUE
+        GROUP BY p.nombre, p.tiempo_prep_min
+        ORDER BY desviacion_min DESC
+        LIMIT 5;
+    """, (fecha_inicio, fecha_fin))
+    desviacion_tiempos = cursor.fetchall()
+
+    # 5. INVENTARIO CRÍTICO (días de stock restante al ritmo de consumo del periodo)
+    cursor.execute("""
+        WITH consumo AS (
+            SELECT r.id_ingrediente, SUM(r.cantidad_base * dp.cantidad) AS consumo_total
+            FROM Receta r
+            JOIN Detalle_Pedido dp ON dp.id_plato = r.id_plato
+            JOIN Pedido pe ON dp.id_pedido = pe.id_pedido
+            WHERE DATE(pe.fecha_apertura) BETWEEN %s AND %s
+              AND dp.estado_item NOT IN ('CANCELADO', 'SUSPENDIDO')
+            GROUP BY r.id_ingrediente
+        )
+        SELECT
+            i.nombre,
+            i.stock_actual,
+            c.consumo_total AS consumo_periodo,
+            ROUND(i.stock_actual / (c.consumo_total / GREATEST(%s::date - %s::date + 1, 1)), 1) AS dias_restantes_estimados
+        FROM Ingrediente i
+        JOIN consumo c ON i.id_ingrediente = c.id_ingrediente
+        WHERE c.consumo_total > 0
+        ORDER BY dias_restantes_estimados ASC
+        LIMIT 3;
+    """, (fecha_inicio, fecha_fin, fecha_fin, fecha_inicio))
+    inventario_critico = cursor.fetchall()
+
+    return {
+        "combinaciones_frecuentes": combinaciones_frecuentes,
+        "extras_populares": extras_populares,
+        "tasa_cancelacion": tasa_cancelacion,
+        "desviacion_tiempos": desviacion_tiempos,
+        "inventario_critico": inventario_critico
+    }
 
 @router.get("/reportes/ventas-periodo")
 def obtener_ventas_periodo(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)):

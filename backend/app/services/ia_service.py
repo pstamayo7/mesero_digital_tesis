@@ -855,7 +855,9 @@ def procesar_audio_bienvenida(ruta_temporal_audio: str, estado_actual_nombre: st
         print("⚠️ Error JSON en Bienvenida:", e)
         return {"exito": False, "error": "Fallo lógico en IA de bienvenida"}
 
-def generar_analisis_negocio(kpis: dict, platos: dict, operacion: dict, periodo: str = "este periodo"):
+def generar_analisis_negocio(kpis: dict, platos: dict, operacion: dict, periodo: str = "este periodo", datos_avanzados: dict = None):
+    datos_avanzados = datos_avanzados or {}
+
     # 1. Extracción de KPIs financieros
     ingresos = kpis.get('ingresos', 0)
     ticket_promedio = kpis.get('ticket', 0)
@@ -869,7 +871,7 @@ def generar_analisis_negocio(kpis: dict, platos: dict, operacion: dict, periodo:
             top_3.append(f"- {platos['labels'][i]}: {platos['cantidades'][i]} uds.")
         platos_str = "\n".join(top_3)
 
-    # 3. Extracción de Datos Críticos Operativos (¡Aquí está la magia para la tesis!)
+    # 3. Extracción de Datos Críticos Operativos
     hora_pico = "Desconocida"
     max_espera = 0
     if operacion and operacion.get('pedidos') and operacion.get('labels'):
@@ -878,41 +880,122 @@ def generar_analisis_negocio(kpis: dict, platos: dict, operacion: dict, periodo:
         if max_pedidos > 0:
             idx_pico = operacion['pedidos'].index(max_pedidos)
             hora_pico = f"{operacion['labels'][idx_pico]} (con {max_pedidos} pedidos simultáneos)"
-            
+
         # Encontramos el tiempo de espera máximo
         if operacion.get('tiempos'):
             max_espera = max(operacion['tiempos'])
 
-    # 4. Prompt Engineering Avanzado
+    # 4. 🌟 NUEVAS SEÑALES "ENTERPRISE" (ver rutas_reportes._obtener_datos_avanzados_negocio)
+    combinaciones = datos_avanzados.get('combinaciones_frecuentes') or []
+    combinaciones_str = "Sin datos suficientes de combinaciones de platos en este periodo."
+    if combinaciones:
+        combinaciones_str = "\n".join(
+            f"- {c['plato_1']} + {c['plato_2']}: vendidos juntos {c['veces_juntos']} veces"
+            for c in combinaciones
+        )
+
+    extras = datos_avanzados.get('extras_populares') or []
+    extras_str = "Sin datos suficientes de extras en este periodo."
+    if extras:
+        extras_str = "\n".join(
+            f"- {e['ingrediente']}: pedido {e['veces_pedido']} veces (mayormente sobre {e['plato_mas_frecuente']})"
+            for e in extras
+        )
+
+    cancelaciones = datos_avanzados.get('tasa_cancelacion') or []
+    cancelacion_str = "Sin incidentes de cancelación/suspensión registrados en este periodo."
+    if cancelaciones:
+        cancelacion_str = "\n".join(
+            f"- {c['nombre']}: {c['tasa_caida_pct']}% de tasa de caída ({c['items_caidos']} de {c['items_totales']} unidades)"
+            for c in cancelaciones
+        )
+
+    desviaciones = datos_avanzados.get('desviacion_tiempos') or []
+    desviacion_str = "Sin datos suficientes de tiempos reales de cocción en este periodo."
+    if desviaciones:
+        desviacion_str = "\n".join(
+            f"- {d['nombre']}: teórico {d['tiempo_teorico_min']} min, real {d['tiempo_real_min']} min (desviación {d['desviacion_min']:+} min)"
+            for d in desviaciones
+        )
+
+    inventario = datos_avanzados.get('inventario_critico') or []
+    inventario_str = "Sin ingredientes en riesgo detectados en este periodo."
+    if inventario:
+        inventario_str = "\n".join(
+            f"- {i['nombre']}: stock actual {i['stock_actual']}, consumo del periodo {i['consumo_periodo']}"
+            + (f", ~{i['dias_restantes_estimados']} días de stock al ritmo de venta actual" if i.get('dias_restantes_estimados') is not None else "")
+            for i in inventario
+        )
+
+    # 5. Prompt Engineering Avanzado — Consultor Predictivo Enterprise
     prompt = f"""
-    Eres un Consultor Gastronómico Senior y Analista de Datos analizando el restaurante "Doña Zita".
+    Eres un Analista de Inteligencia de Negocios de Restaurantes (Business Intelligence) de nivel
+    Enterprise, especializado en datos gastronómicos, analizando el restaurante "Doña Zita".
     Analiza este reporte del periodo: {periodo}.
 
-    DATOS REALES EXTRAÍDOS DE POSTGRESQL:
+    DATOS FINANCIEROS:
     - Ingresos Brutos: ${ingresos}
     - Volumen de Órdenes: {ordenes}
     - Ticket Promedio: ${ticket_promedio}
-    
-    - Top Platos Más Vendidos:
+
+    TOP PLATOS MÁS VENDIDOS:
     {platos_str}
-    
-    - Datos de Operación en Cocina:
+
+    OPERACIÓN EN COCINA:
     Hora Pico de Demanda: {hora_pico}
     Tiempo Máximo de Espera Promedio: {max_espera} minutos.
+
+    COMBINACIONES DE PLATOS MÁS FRECUENTES (vendidos juntos en la misma orden):
+    {combinaciones_str}
+
+    EXTRAS MÁS SOLICITADOS:
+    {extras_str}
+
+    TASA DE CANCELACIÓN/SUSPENSIÓN POR PLATO:
+    {cancelacion_str}
+
+    DESVIACIÓN DE TIEMPOS DE COCCIÓN (teórico de la BD vs. tiempo real en cocina):
+    {desviacion_str}
+
+    INVENTARIO CRÍTICO (ingredientes con menos días de stock al ritmo de venta observado):
+    {inventario_str}
 
     REGLAS ESTRICTAS PARA TU RESPUESTA:
     1. Cero saludos o introducciones genéricas. Ve directo al grano.
     2. Escribe exclusivamente en formato Markdown (usa **negritas** para resaltar métricas clave).
-    3. Tu respuesta debe tener EXACTAMENTE estas tres secciones con sus respectivos emojis:
+    3. SIEMPRE menciona números reales de los datos de arriba (nombres de platos/ingredientes,
+       porcentajes, minutos, cantidades). PROHIBIDO dar un consejo genérico que no esté anclado a
+       un dato específico de este reporte. Si una sección no tiene datos suficientes, dilo en una
+       frase corta y continúa con la siguiente.
+    4. Tu respuesta debe tener EXACTAMENTE estas CINCO secciones, en este orden, con sus emojis:
 
-    ### 📈 Rendimiento Financiero
-    (Analiza si el ticket promedio y volumen son saludables).
+    ### 🚀 Optimización del Menú y Upselling
+    (Usa los datos de EXTRAS MÁS SOLICITADOS. Si un extra se repite mucho sobre un plato
+    específico, sugiere crear una variante premium o combo fijo. REGLA LÓGICA ESTRICTA:
+    NUNCA sugieras añadir un extra a un plato que ya contiene ese ingrediente como parte de
+    su receta base, ya que es una sugerencia inútil para el dueño. Enfócate exclusivamente
+    en combinaciones novedosas o sugiere versiones "Doble Porción" si el ingrediente base es
+    muy demandado como extra).
 
-    ### 🍽️ Análisis del Menú
-    (Qué decisión de inventario o promoción tomar respecto a los platos top).
+    ### ⏱️ Eficiencia Operativa y Ajuste de Tiempos
+    (Analiza la "Desviación de Tiempos" entre el tiempo real de cocción y el tiempo teórico
+    configurado. REGLA DE ACCIÓN: Si detectas que una categoría o plato específico tiene
+    demoras consistentes frente a su tiempo estimado, debes recomendar EXPLÍCITAMENTE que el
+    administrador aumente el 'tiempo de preparación estimado' de ese plato en el sistema de
+    base de datos para no generar falsas expectativas en los clientes y equilibrar la cola
+    de producción).
 
-    ### ⚠️ Cuello de Botella Operativo
-    (Critica la relación entre la hora pico y el tiempo de espera máximo. Si la espera supera los 20 minutos, da una alerta crítica y sugiere una acción operativa inmediata en cocina).
+    ### 🔄 Rotación y Facturación
+    (Usa el Ticket Promedio y las COMBINACIONES DE PLATOS MÁS FRECUENTES para proponer estrategias
+    de venta cruzada concretas que suban el ticket promedio).
+
+    ### 📈 Predicción de Demanda
+    (Usa la Hora Pico de Demanda para sugerir una promoción específica en las horas valle).
+
+    ### 📦 Alerta de Inventario
+    (Usa INVENTARIO CRÍTICO para advertir, con los días de stock estimados, qué ingrediente urge
+    reabastecer y qué platos del TOP se verían afectados si se agota).
+
     """
 
     try:

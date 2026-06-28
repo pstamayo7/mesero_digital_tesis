@@ -25,13 +25,26 @@ def obtener_menu():
         
         # 🌟 CORRECCIÓN 1: Agregamos p.ruta_imagen al SELECT
         cursor.execute("""
-            SELECT c.id_categoria, c.nombre AS categoria_nombre, 
+            SELECT c.id_categoria, c.nombre AS categoria_nombre,
                    p.id_plato, p.nombre AS plato_nombre, p.precio_base, p.tiempo_prep_min, p.ruta_imagen
             FROM Categoria c
             JOIN Plato p ON c.id_categoria = p.id_categoria
         """)
         filas = cursor.fetchall()
-        
+
+        # 🌟 DISPONIBILIDAD: un plato queda "agotado" si algún ingrediente de su receta
+        # no alcanza el stock mínimo para preparar una porción base.
+        cursor.execute("""
+            SELECT r.id_plato, i.stock_actual, r.cantidad_base
+            FROM Receta r
+            JOIN Ingrediente i ON r.id_ingrediente = i.id_ingrediente
+        """)
+        platos_agotados = {
+            fila["id_plato"]
+            for fila in cursor.fetchall()
+            if float(fila["stock_actual"]) < float(fila["cantidad_base"])
+        }
+
         categorias_dict = {}
         for fila in filas:
             id_cat = fila['id_categoria']
@@ -41,16 +54,17 @@ def obtener_menu():
                     "nombre": fila['categoria_nombre'],
                     "platos": []
                 }
-            
+
             # 🌟 CORRECCIÓN 2: Agregamos ruta_imagen al diccionario que se envía a React
             categorias_dict[id_cat]["platos"].append({
                 "id_plato": fila['id_plato'],
                 "nombre": fila['plato_nombre'],
                 "descripcion": f"Tiempo estimado: {fila['tiempo_prep_min']} min",
                 "precio": float(fila['precio_base']),
-                "ruta_imagen": fila['ruta_imagen']
+                "ruta_imagen": fila['ruta_imagen'],
+                "disponible": fila['id_plato'] not in platos_agotados
             })
-            
+
         return {"categorias": list(categorias_dict.values())}
         
     except Exception as e:

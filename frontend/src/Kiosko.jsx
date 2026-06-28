@@ -615,27 +615,82 @@ function Kiosko() {
             <div key={categoria.id_categoria} className="categoria">
               <h2>{categoria.nombre}</h2>
               <div className="platos-grid">
-                {categoria.platos.map((plato) => (
-                  <div key={plato.id_plato} className="tarjeta-plato">
-                    <img
-                      src={`http://127.0.0.1:8000${plato.ruta_imagen || '/imagenes/default.png'}`}
-                      alt={plato.nombre}
-                      style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px 8px 0 0', marginBottom: '10px' }}
-                    />
-                    <h3>{plato.nombre}</h3>
-                    <p>{plato.descripcion}</p>
-                    <div className="plato-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
-                      <span className="precio" style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>${plato.precio.toFixed(2)}</span>
-                      <button
-                        onClick={() => agregarAlCarrito(plato.nombre)}
-                        className="btn-agregar"
-                        style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-                      >
-                        Agregar
-                      </button>
+                {categoria.platos.map((plato) => {
+                  const disponible = plato.disponible !== false; // por defecto disponible si el backend no manda el campo
+                  return (
+                    <div
+                      key={plato.id_plato}
+                      className="tarjeta-plato"
+                      style={{
+                        cursor: disponible ? 'pointer' : 'not-allowed',
+                        opacity: disponible ? 1 : 0.85,
+                        transition: 'transform 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => { if (disponible) e.currentTarget.style.transform = 'scale(1.02)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                    >
+                      <div style={{ position: 'relative' }}>
+                        <img
+                          src={`http://127.0.0.1:8000${plato.ruta_imagen || '/imagenes/default.png'}`}
+                          alt={plato.nombre}
+                          style={{
+                            width: '100%',
+                            height: '180px',
+                            objectFit: 'cover',
+                            borderRadius: '8px 8px 0 0',
+                            marginBottom: '10px',
+                            filter: disponible ? 'none' : 'grayscale(100%)'
+                          }}
+                        />
+                        {!disponible && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                            borderRadius: '8px 8px 0 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <span style={{
+                              backgroundColor: '#374151',
+                              color: 'white',
+                              fontWeight: 'bold',
+                              padding: '8px 16px',
+                              borderRadius: '20px',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                              fontSize: '0.95rem',
+                              textAlign: 'center'
+                            }}>
+                              🚫 Agotado por el momento
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <h3>{plato.nombre}</h3>
+                      <p>{plato.descripcion}</p>
+                      <div className="plato-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
+                        <span className="precio" style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>${plato.precio.toFixed(2)}</span>
+                        {disponible ? (
+                          <button
+                            onClick={() => agregarAlCarrito(plato.nombre)}
+                            className="btn-agregar"
+                            style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                          >
+                            Agregar
+                          </button>
+                        ) : (
+                          <span style={{ color: '#ef4444', fontStyle: 'italic', fontSize: '0.95rem' }}>
+                            Agotado temporalmente, lo sentimos.
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
