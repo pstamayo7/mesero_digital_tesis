@@ -2,11 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import './BienvenidaPaleta.css'
 import ModalEdicionPlato from './ModalEdicionPlato.jsx'
+import SeleccionModalidad from './SeleccionModalidad.jsx'
 
 function Kiosko() {
   const [pasoActual, setPasoActual] = useState(0);
   const [mesasLibres, setMesasLibres] = useState([]);
   const [esParaLlevar, setEsParaLlevar] = useState(false);
+
+  // 🌟 PANTALLA INICIAL: "COMER AQUÍ" vs "PARA LLEVAR" (antes de elegir paleta/nombre)
+  const [modalidadElegida, setModalidadElegida] = useState(null); // null | 'local' | 'llevar'
 
   // 🌟 ESTADOS PARA EL NOMBRE Y TECLADO
   const [nombreCliente, setNombreCliente] = useState("");
@@ -398,6 +402,12 @@ function Kiosko() {
   // 🌟 PANTALLA 0: SELECCIÓN DE MESA Y PARA LLEVAR (ACTUALIZADA)
   // =====================================================================
   if (pasoActual === 0) {
+
+    // 🌟 PRIMER CONTACTO: el cliente todavía no eligió "Comer aquí" / "Para llevar"
+    if (modalidadElegida === null) {
+      return <SeleccionModalidad onSeleccion={(modalidad) => setModalidadElegida(modalidad)} />;
+    }
+
     return (
       <div className="bienvenida-pantalla">
         <div className="bienvenida-header">
@@ -412,98 +422,107 @@ function Kiosko() {
           </div>
         </div>
 
-        <h2 className="bienvenida-titulo">🥟 ¡Bienvenido a Doña Zita!</h2>
-        <h3 className="bienvenida-subtitulo">
-          Por favor, selecciona tu <strong>número de paleta</strong> para comenzar:
-        </h3>
+        <button
+          onClick={() => setModalidadElegida(null)}
+          className="self-start text-stone-500 font-semibold text-sm mb-2 hover:text-stone-800 transition-colors"
+        >
+          ⬅️ Cambiar modalidad
+        </button>
 
-        <div className="grid-paletas">
-          {mesasLibres.length > 0 ? (
-            mesasLibres.map(mesa => (
-              <button
-                key={mesa}
-                onClick={() => { setNumeroMesa(mesa); setEsParaLlevar(false); setPasoActual(1); }}
-                className="btn-paleta"
-              >
-                {mesa}
-              </button>
-            ))
-          ) : (
-            <p className="col-span-full text-red-500 font-bold">Cargando paletas disponibles...</p>
-          )}
-        </div>
+        {modalidadElegida === 'local' ? (
+          <>
+            <h2 className="bienvenida-titulo">🥟 ¡Bienvenido a Doña Zita!</h2>
+            <h3 className="bienvenida-subtitulo">
+              Por favor, selecciona tu <strong>número de paleta</strong> para comenzar:
+            </h3>
 
-        <div className="divisor-bienvenida" />
-
-        <div className="card-llevar">
-          <h3 className="card-llevar-titulo">🛍️ ¿Pedido para llevar? Habla con nuestra Anfitriona</h3>
-
-          {/* CUADRO DE DIÁLOGO DE LA IA */}
-          {mensajeAnfitriona && (
-            <div className="caja-anfitriona">
-              🤖 IA: "{mensajeAnfitriona}"
+            <div className="grid-paletas">
+              {mesasLibres.length > 0 ? (
+                mesasLibres.map(mesa => (
+                  <button
+                    key={mesa}
+                    onClick={() => { setNumeroMesa(mesa); setEsParaLlevar(false); setPasoActual(1); }}
+                    className="btn-paleta"
+                  >
+                    {mesa}
+                  </button>
+                ))
+              ) : (
+                <p className="col-span-full text-red-500 font-bold">Cargando paletas disponibles...</p>
+              )}
             </div>
-          )}
+          </>
+        ) : (
+          <div className="card-llevar">
+            <h3 className="card-llevar-titulo">🛍️ ¿Pedido para llevar? Habla con nuestra Anfitriona</h3>
 
-          {/* BOTONES DE DICTADO Y TECLADO */}
-          <div className="flex gap-4 w-full">
-            <button
-              onMouseDown={iniciarGrabacionBienvenida}
-              onMouseUp={detenerGrabacionBienvenida}
-              onTouchStart={iniciarGrabacionBienvenida}
-              onTouchEnd={detenerGrabacionBienvenida}
-              className={`btn-voz-bienvenida ${grabandoNombre ? 'grabando' : ''}`}
-            >
-              {grabandoNombre ? "👂 Te escucho (Suelta para enviar)..." : "🎙️ Mantén presionado para hablar"}
-            </button>
+            {/* CUADRO DE DIÁLOGO DE LA IA */}
+            {mensajeAnfitriona && (
+              <div className="caja-anfitriona">
+                🤖 IA: "{mensajeAnfitriona}"
+              </div>
+            )}
+
+            {/* BOTONES DE DICTADO Y TECLADO */}
+            <div className="flex gap-4 w-full">
+              <button
+                onMouseDown={iniciarGrabacionBienvenida}
+                onMouseUp={detenerGrabacionBienvenida}
+                onTouchStart={iniciarGrabacionBienvenida}
+                onTouchEnd={detenerGrabacionBienvenida}
+                className={`btn-voz-bienvenida ${grabandoNombre ? 'grabando' : ''}`}
+              >
+                {grabandoNombre ? "👂 Te escucho (Suelta para enviar)..." : "🎙️ Mantén presionado para hablar"}
+              </button>
+
+              <button
+                onClick={() => setMostrarTeclado(!mostrarTeclado)}
+                className="btn-teclado"
+              >
+                ⌨️ {mostrarTeclado ? "Ocultar Teclado" : "Escribir Manualmente"}
+              </button>
+            </div>
+
+            <input
+              type="text"
+              readOnly
+              placeholder="TU NOMBRE APARECERÁ AQUÍ"
+              value={nombreCliente}
+              className="input-nombre-bienvenida"
+            />
+
+            {/* TECLADO VIRTUAL */}
+            {mostrarTeclado && (
+              <div className="teclado-virtual">
+                {tecladoFilas.map((fila, i) => (
+                  <div key={i} className="flex justify-center gap-1">
+                    {fila.map(tecla => (
+                      <button
+                        key={tecla}
+                        onClick={() => pulsarTecla(tecla)}
+                        className="tecla-virtual"
+                      >
+                        {tecla}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                <div className="flex justify-center gap-1">
+                  <button onClick={() => pulsarTecla('ESPACIO')} className="tecla-espacio">ESPACIO</button>
+                  <button onClick={() => pulsarTecla('BORRAR')} className="tecla-borrar">⌫ BORRAR</button>
+                </div>
+              </div>
+            )}
 
             <button
-              onClick={() => setMostrarTeclado(!mostrarTeclado)}
-              className="btn-teclado"
+              disabled={!nombreCliente.trim()}
+              onClick={() => { setNumeroMesa(0); setEsParaLlevar(true); setPasoActual(1); setMensajeAnfitriona(""); }}
+              className={`btn-siguiente-paso ${nombreCliente.trim() ? 'activo' : ''}`}
             >
-              ⌨️ {mostrarTeclado ? "Ocultar Teclado" : "Escribir Manualmente"}
+              Siguiente Paso ➡️
             </button>
           </div>
-
-          <input
-            type="text"
-            readOnly
-            placeholder="TU NOMBRE APARECERÁ AQUÍ"
-            value={nombreCliente}
-            className="input-nombre-bienvenida"
-          />
-
-          {/* TECLADO VIRTUAL */}
-          {mostrarTeclado && (
-            <div className="teclado-virtual">
-              {tecladoFilas.map((fila, i) => (
-                <div key={i} className="flex justify-center gap-1">
-                  {fila.map(tecla => (
-                    <button
-                      key={tecla}
-                      onClick={() => pulsarTecla(tecla)}
-                      className="tecla-virtual"
-                    >
-                      {tecla}
-                    </button>
-                  ))}
-                </div>
-              ))}
-              <div className="flex justify-center gap-1">
-                <button onClick={() => pulsarTecla('ESPACIO')} className="tecla-espacio">ESPACIO</button>
-                <button onClick={() => pulsarTecla('BORRAR')} className="tecla-borrar">⌫ BORRAR</button>
-              </div>
-            </div>
-          )}
-
-          <button
-            disabled={!nombreCliente.trim()}
-            onClick={() => { setNumeroMesa(0); setEsParaLlevar(true); setPasoActual(1); setMensajeAnfitriona(""); }}
-            className={`btn-siguiente-paso ${nombreCliente.trim() ? 'activo' : ''}`}
-          >
-            Siguiente Paso ➡️
-          </button>
-        </div>
+        )}
       </div>
     );
   }
@@ -539,7 +558,7 @@ function Kiosko() {
             🪑 {esParaLlevar ? `Llevar: ${nombreCliente}` : `Paleta: ${numeroMesa}`}
           </div>
           <button
-            onClick={() => { setPasoActual(0); setMostrarTeclado(false); setMensajeAnfitriona(""); }}
+            onClick={() => { setPasoActual(0); setModalidadElegida(null); setMostrarTeclado(false); setMensajeAnfitriona(""); }}
             className="w-11 h-11 rounded-full bg-red-950 text-white flex items-center justify-center shadow-md transition-all duration-150 ease-out transform-gpu active:scale-95 hover:bg-red-800"
             title="Cancelar"
           >
