@@ -1,0 +1,137 @@
+/* =====================================================================
+   AVISO MODAL · Reemplazo estético de window.alert()/window.confirm().
+   Estructura compartida entre Kiosko (cálido) y Caja/Ops (bronce):
+   cada pantalla solo aporta sus tokens de color vía .aviso-tema-*.
+   ===================================================================== */
+
+.aviso-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 14, 10, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  animation: aviso-fade-in 180ms ease-out;
+}
+
+@keyframes aviso-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.aviso-box {
+  background: var(--aviso-surface);
+  color: var(--aviso-ink);
+  border-radius: var(--aviso-radius, 18px);
+  border-top: 4px solid var(--aviso-accent);
+  max-width: 420px;
+  width: 100%;
+  padding: 30px 26px 24px;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.45);
+  font-family: var(--aviso-font, inherit);
+  text-align: center;
+  animation: aviso-pop-in 220ms var(--aviso-ease, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+@keyframes aviso-pop-in {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.aviso-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  background: var(--aviso-icon-bg);
+  color: var(--aviso-accent);
+}
+.aviso-icon-wrap.is-error { background: var(--aviso-danger-soft); color: var(--aviso-danger); }
+.aviso-icon-wrap.is-exito { background: var(--aviso-success-soft); color: var(--aviso-success); }
+
+.aviso-titulo {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: var(--aviso-font-display, inherit);
+  color: var(--aviso-ink);
+}
+
+.aviso-mensaje {
+  margin: 0 0 22px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--aviso-ink-soft);
+}
+
+.aviso-botones {
+  display: flex;
+  gap: 10px;
+}
+
+.aviso-btn {
+  flex: 1;
+  padding: 13px 16px;
+  border-radius: 11px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-family: var(--aviso-font, inherit);
+  cursor: pointer;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+.aviso-btn:active { transform: scale(0.96); }
+@media (hover: hover) and (pointer: fine) {
+  .aviso-btn:hover { filter: brightness(1.07); }
+}
+
+.aviso-btn-primary { background: var(--aviso-accent); color: var(--aviso-accent-contrast, #fff); }
+.aviso-btn-primary.is-danger { background: var(--aviso-danger); }
+.aviso-btn-ghost {
+  background: var(--aviso-surface-alt);
+  color: var(--aviso-ink-soft);
+  border: 1px solid var(--aviso-border);
+}
+
+/* ---------------- Tema Kiosko (cálido: rojo + dorado) ---------------- */
+.aviso-tema-kiosko {
+  --aviso-accent: var(--dz-red-800);
+  --aviso-accent-contrast: #fff;
+  --aviso-surface: var(--dz-cream);
+  --aviso-surface-alt: var(--dz-cream-2);
+  --aviso-ink: var(--dz-ink);
+  --aviso-ink-soft: var(--dz-ink-soft);
+  --aviso-border: var(--dz-cream-2);
+  --aviso-icon-bg: var(--dz-gold-soft);
+  --aviso-danger: var(--dz-red-700);
+  --aviso-danger-soft: #fbe3e1;
+  --aviso-success: #2f7a4f;
+  --aviso-success-soft: #e1f1e7;
+  --aviso-radius: 22px;
+  --aviso-ease: var(--dz-ease-out);
+}
+
+/* ---------------- Tema Caja/Ops (bronce, identidad de personal) ------ */
+.aviso-tema-ops {
+  --aviso-accent: var(--ops-accent);
+  --aviso-accent-contrast: var(--ops-accent-contrast);
+  --aviso-surface: var(--ops-surface);
+  --aviso-surface-alt: var(--ops-surface-alt);
+  --aviso-ink: var(--ops-ink);
+  --aviso-ink-soft: var(--ops-ink-soft);
+  --aviso-border: var(--ops-border);
+  --aviso-icon-bg: var(--ops-accent-soft);
+  --aviso-danger: var(--ops-danger);
+  --aviso-danger-soft: var(--ops-danger-soft);
+  --aviso-success: var(--ops-success);
+  --aviso-success-soft: var(--ops-success-soft);
+  --aviso-radius: var(--ops-radius);
+  --aviso-font: var(--ops-font-body);
+  --aviso-font-display: var(--ops-font-display);
+  --aviso-ease: var(--ops-ease);
+}

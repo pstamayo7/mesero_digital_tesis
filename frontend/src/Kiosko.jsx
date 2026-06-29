@@ -4,6 +4,7 @@ import './BienvenidaPaleta.css'
 import './KioskoDonaZita.css'
 import ModalEdicionPlato from './ModalEdicionPlato.jsx'
 import SeleccionModalidad from './SeleccionModalidad.jsx'
+import AvisoModal from './AvisoModal.jsx'
 
 function Kiosko() {
   const [pasoActual, setPasoActual] = useState(0);
@@ -37,11 +38,18 @@ function Kiosko() {
   const [platoViendoDetalle, setPlatoViendoDetalle] = useState(null);
   const [ingredientesDetalle, setIngredientesDetalle] = useState([]);
 
+  // 🌟 AVISO DE CONFIRMACIÓN DE ORDEN (reemplaza alert() del navegador)
+  const [aviso, setAviso] = useState(null); // { tipo, titulo, mensaje, alCerrar? } | null
+
+  // 🌟 Cierra el modal de detalle y limpia su lista de ingredientes a la vez,
+  // para no depender de un setState síncrono dentro del useEffect de abajo.
+  const cerrarDetallePlato = () => {
+    setPlatoViendoDetalle(null);
+    setIngredientesDetalle([]);
+  };
+
   useEffect(() => {
-    if (!platoViendoDetalle) {
-      setIngredientesDetalle([]);
-      return;
-    }
+    if (!platoViendoDetalle) return;
     fetch(`http://127.0.0.1:8000/menu/${platoViendoDetalle.id_plato}/ingredientes`)
       .then(res => res.json())
       .then(data => setIngredientesDetalle(data.ingredientes_base || []))
@@ -93,8 +101,12 @@ function Kiosko() {
   // táctiles del carrito.
   const recalcularMetricasCarrito = (carritoParaCalcular) => {
     if (!carritoParaCalcular || carritoParaCalcular.length === 0) {
-      setTiempoEstimado(null);
-      setErrorStock("");
+      // 🌟 Igual que las ramas de fetch de abajo, resolvemos en microtask para no
+      // actualizar estado de forma síncrona dentro del useEffect que la invoca.
+      Promise.resolve().then(() => {
+        setTiempoEstimado(null);
+        setErrorStock("");
+      });
       return;
     }
 
@@ -286,6 +298,7 @@ function Kiosko() {
       mediaRecorderRef.current.start();
       setGrabandoNombre(true);
     } catch (error) {
+      console.error("Error solicitando micrófono:", error);
       alert("Permite el acceso al micrófono.");
     }
   };
@@ -369,7 +382,7 @@ function Kiosko() {
 
       mediaRecorderRef.current.start()
       setGrabando(true)
-    } catch (error) { alert("Permite el acceso al micrófono.") }
+    } catch (error) { console.error("Error solicitando micrófono:", error); alert("Permite el acceso al micrófono.") }
   }
 
   const detenerGrabacion = () => {
@@ -392,13 +405,20 @@ function Kiosko() {
       })
 
       if (respuesta.ok) {
-        alert("¡Orden confirmada! Se está preparando en cocina.");
-        setCarrito([]); setTranscripcion(""); setNumeroMesa(0); setNombreCliente(""); setEsParaLlevar(false); setPasoActual(0); setMostrarTeclado(false); setMensajeAnfitriona("");
+        setAviso({
+          tipo: 'exito',
+          titulo: '¡Orden confirmada!',
+          mensaje: 'Tu pedido se está preparando en cocina.',
+          alCerrar: () => {
+            setCarrito([]); setTranscripcion(""); setNumeroMesa(0); setNombreCliente(""); setEsParaLlevar(false); setPasoActual(0); setMostrarTeclado(false); setMensajeAnfitriona("");
+          }
+        });
       } else {
-        alert("Hubo un problema al enviar la orden a cocina.");
+        setAviso({ tipo: 'error', titulo: 'No se pudo enviar la orden', mensaje: 'Hubo un problema al enviar la orden a cocina. Intenta de nuevo.' });
       }
     } catch (error) {
-      alert("Error de conexión al confirmar la orden.");
+      console.error("Error confirmando orden:", error);
+      setAviso({ tipo: 'error', titulo: 'Sin conexión', mensaje: 'No pudimos conectar con el servidor. Intenta de nuevo.' });
     }
   }
 
@@ -414,7 +434,7 @@ function Kiosko() {
     setErrorStock("");
     setTiempoEstimado(null);
     setItemEditando(null);
-    setPlatoViendoDetalle(null);
+    cerrarDetallePlato();
     setMostrarTeclado(false);
     setMensajeAnfitriona("");
     setModalidadElegida(null);
@@ -855,7 +875,7 @@ function Kiosko() {
 
       {/* 🌟 MODAL DE DETALLE DE PLATO (solo informativo + acceso rápido al carrito) */}
       {platoViendoDetalle && (
-        <div className="modal-overlay" onClick={() => setPlatoViendoDetalle(null)}>
+        <div className="modal-overlay" onClick={cerrarDetallePlato}>
           <div className="modal-detalle-plato" onClick={(e) => e.stopPropagation()}>
             <div className="modal-imagen-wrap">
               <img
@@ -864,7 +884,7 @@ function Kiosko() {
                 className="modal-imagen"
                 style={{ filter: platoViendoDetalle.disponible === false ? 'grayscale(100%)' : 'none' }}
               />
-              <button className="modal-cerrar" onClick={() => setPlatoViendoDetalle(null)}>✕</button>
+              <button className="modal-cerrar" onClick={cerrarDetallePlato}>✕</button>
             </div>
             <div className="modal-body">
               <h2 className="modal-titulo">{platoViendoDetalle.nombre}</h2>
@@ -891,7 +911,7 @@ function Kiosko() {
                 onClick={(e) => {
                   agregarAlCarrito(platoViendoDetalle.nombre);
                   e.currentTarget.classList.add('dz-pop-soft');
-                  setTimeout(() => setPlatoViendoDetalle(null), 220);
+                  setTimeout(cerrarDetallePlato, 220);
                 }}
               >
                 {platoViendoDetalle.disponible === false ? 'Agotado por el momento' : 'Agregar al Carrito'}
@@ -899,6 +919,20 @@ function Kiosko() {
             </div>
           </div>
         </div>
+      )}
+
+      {aviso && (
+        <AvisoModal
+          tema="kiosko"
+          tipo={aviso.tipo}
+          titulo={aviso.titulo}
+          mensaje={aviso.mensaje}
+          onCerrar={() => {
+            const alCerrar = aviso.alCerrar;
+            setAviso(null);
+            if (alCerrar) alCerrar();
+          }}
+        />
       )}
     </div>
   )

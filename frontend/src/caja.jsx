@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Archive, Armchair, Banknote, CheckCircle2, Receipt, ShoppingBag } from 'lucide-react';
 import { apiFetch } from './utils/apiFetch';
+import AvisoModal from './AvisoModal.jsx';
 import './OpsTheme.css';
 
 function Caja() {
     const [cuentas, setCuentas] = useState([]);
     const [cargando, setCargando] = useState(true);
+    const [dialogo, setDialogo] = useState(null); // { tipo, titulo, mensaje, textoConfirmar?, onConfirmar? } | null
 
    const cargarCuentas = () => {
 
@@ -31,32 +33,42 @@ function Caja() {
         return () => clearInterval(intv);
     }, []);
 
-    const manejarCobro = async (id_pedido, id_mesa, total) => {
+    const manejarCobro = (id_pedido, id_mesa, total) => {
         // 🌟 Mismo endpoint para cobrar o archivar: en ambos casos hay que cerrar el
         // pedido y liberar la mesa en el backend. Solo cambia el mensaje de confirmación.
         const pedidoAnulado = total <= 0;
         const mensajeConfirmacion = pedidoAnulado
             ? `Este pedido quedó en $0.00 (ítems cancelados/suspendidos). ¿Archivar el Pedido #${id_pedido} y liberar la mesa?`
             : `¿Confirmas el pago de $${total} por el Pedido #${id_pedido}?`;
-        const confirmar = window.confirm(mensajeConfirmacion);
 
-        if (confirmar) {
-            try {
-                const respuesta = await apiFetch(`/caja/cobrar/${id_pedido}`, {
-                    method: 'POST'
-                });
+        setDialogo({
+            tipo: 'confirmar',
+            titulo: pedidoAnulado ? 'Archivar pedido' : 'Confirmar cobro',
+            mensaje: mensajeConfirmacion,
+            textoConfirmar: pedidoAnulado ? 'Archivar' : 'Confirmar pago',
+            onConfirmar: async () => {
+                try {
+                    const respuesta = await apiFetch(`/caja/cobrar/${id_pedido}`, {
+                        method: 'POST'
+                    });
 
-                if (respuesta.ok) {
-                    const mensajeExito = pedidoAnulado ? 'Orden archivada.' : 'Pago registrado.';
-                    alert(`${mensajeExito} ${id_mesa > 0 ? `La Paleta ${id_mesa} ha sido liberada.` : 'Pedido para llevar entregado.'}`);
-                    cargarCuentas(); // Recargamos la lista para que desaparezca
-                } else {
-                    alert("Hubo un error al procesar el cobro.");
+                    if (respuesta.ok) {
+                        const mensajeExito = pedidoAnulado ? 'Orden archivada.' : 'Pago registrado.';
+                        setDialogo({
+                            tipo: 'exito',
+                            titulo: pedidoAnulado ? 'Orden archivada' : 'Pago registrado',
+                            mensaje: `${mensajeExito} ${id_mesa > 0 ? `La Paleta ${id_mesa} ha sido liberada.` : 'Pedido para llevar entregado.'}`
+                        });
+                        cargarCuentas(); // Recargamos la lista para que desaparezca
+                    } else {
+                        setDialogo({ tipo: 'error', titulo: 'Error al cobrar', mensaje: 'Hubo un error al procesar el cobro.' });
+                    }
+                } catch (error) {
+                    console.error("Error procesando cobro:", error);
+                    setDialogo({ tipo: 'error', titulo: 'Error de conexión', mensaje: 'Error de conexión con el servidor.' });
                 }
-            } catch (error) {
-                alert("Error de conexión con el servidor.");
             }
-        }
+        });
     };
 
     return (
@@ -172,6 +184,18 @@ function Caja() {
             )
           })}
         </div>
+      )}
+
+      {dialogo && (
+        <AvisoModal
+          tema="ops"
+          tipo={dialogo.tipo}
+          titulo={dialogo.titulo}
+          mensaje={dialogo.mensaje}
+          textoConfirmar={dialogo.textoConfirmar}
+          onConfirmar={dialogo.onConfirmar}
+          onCerrar={() => setDialogo(null)}
+        />
       )}
     </div>
   );
