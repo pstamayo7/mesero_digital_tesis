@@ -4,6 +4,7 @@ import {
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import ReactMarkdown from 'react-markdown';
+import { apiFetch } from './utils/apiFetch';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, ChartTooltip, Legend, Filler);
 
@@ -94,7 +95,7 @@ export default function AdminReportes() {
 
     const cargarDatos = async () => {
       try {
-        const resVentas = await fetch(`http://localhost:8000/admin/reportes/ventas-periodo?${qs}`);
+        const resVentas = await apiFetch(`/admin/reportes/ventas-periodo?${qs}`);
         if (resVentas.ok) {
           setHistorial(await resVentas.json());
           // Cerramos cualquier acordeón abierto de una consulta anterior
@@ -102,16 +103,16 @@ export default function AdminReportes() {
           setOrdenesExpandidas({});
         }
 
-        const resPlatos = await fetch(`http://localhost:8000/admin/reportes/platos?${qs}`);
+        const resPlatos = await apiFetch(`/admin/reportes/platos?${qs}`);
         if (resPlatos.ok) setDatosPlatos(await resPlatos.json());
 
-        const resOperacion = await fetch(`http://localhost:8000/admin/reportes/operacion?${qs}`);
+        const resOperacion = await apiFetch(`/admin/reportes/operacion?${qs}`);
         if (resOperacion.ok) setDatosOperacion(await resOperacion.json());
 
-        const resEvolucion = await fetch(`http://localhost:8000/admin/reportes/evolucion?${qs}`);
+        const resEvolucion = await apiFetch(`/admin/reportes/evolucion?${qs}`);
         if (resEvolucion.ok) setDatosEvolucion(await resEvolucion.json());
 
-        const resHeatmap = await fetch(`http://localhost:8000/admin/reportes/heatmap?${qs}`);
+        const resHeatmap = await apiFetch(`/admin/reportes/heatmap?${qs}`);
         if (resHeatmap.ok) setDatosHeatmap(await resHeatmap.json());
 
       } catch (error) {
@@ -209,7 +210,7 @@ export default function AdminReportes() {
     setCargandoIA(true);
     setAnalisisIA(null);
     try {
-      const response = await fetch('http://localhost:8000/admin/reportes/generar-analisis-ia', {
+      const response = await apiFetch('/admin/reportes/generar-analisis-ia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

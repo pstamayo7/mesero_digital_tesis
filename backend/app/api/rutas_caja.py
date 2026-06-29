@@ -1,9 +1,11 @@
 # backend/app/api/rutas_caja.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from psycopg2.extras import RealDictCursor
 from app.core.database import get_db_connection
+from app.core.seguridad import verificar_rol_requerido
 
-router = APIRouter()
+# 🌟 RBAC: Caja es exclusiva de empleados y administradores.
+router = APIRouter(dependencies=[Depends(verificar_rol_requerido(["empleado", "administrador"]))])
 
 @router.get("/caja/pendientes", tags=["Caja y Facturación"])
 def obtener_cuentas_pendientes():

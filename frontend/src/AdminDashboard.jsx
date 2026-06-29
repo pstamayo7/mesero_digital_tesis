@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminReportes from './AdminReportes'
+import { apiFetch } from './utils/apiFetch'
 
 export default function AdminDashboard() {
   const [tabActiva, setTabActiva] = useState('platos');
@@ -41,27 +42,27 @@ export default function AdminDashboard() {
 
   // ================= API CALLS =================
   const cargarConfiguracion = async () => {
-    const res = await fetch('http://localhost:8000/admin/configuracion');
+    const res = await apiFetch('/admin/configuracion');
     if (res.ok) setConfig(await res.json());
   };
 
   const guardarConfiguracion = async (e) => {
     e.preventDefault();
-    const res = await fetch('http://localhost:8000/admin/configuracion', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
+    const res = await apiFetch('/admin/configuracion', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
     if (res.ok) mostrarMensaje("✅ Configuración guardada correctamente");
   };
 
   const cargarIngredientes = async () => {
-    const res = await fetch('http://localhost:8000/admin/ingredientes');
+    const res = await apiFetch('/admin/ingredientes');
     if (res.ok) setIngredientes(await res.json());
   };
 
   const guardarIngrediente = async (ing, esNuevo = false) => {
     // Saneamos espacios fantasma antes de que lleguen a PostgreSQL (rompen el cruce de nombres con el LLM)
     const ingSaneado = { ...ing, nombre: ing.nombre.trim() };
-    const url = esNuevo ? 'http://localhost:8000/admin/ingredientes' : `http://localhost:8000/admin/ingredientes/${ing.id_ingrediente}`;
+    const url = esNuevo ? '/admin/ingredientes' : `/admin/ingredientes/${ing.id_ingrediente}`;
     const method = esNuevo ? 'POST' : 'PUT';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ingSaneado) });
+    const res = await apiFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ingSaneado) });
     if (res.ok) {
       mostrarMensaje(esNuevo ? "✅ Ingrediente agregado" : "✅ Ingrediente actualizado");
       cargarIngredientes();
@@ -69,21 +70,21 @@ export default function AdminDashboard() {
   };
 
   const cargarPlatos = async () => {
-    const res = await fetch('http://localhost:8000/admin/platos');
+    const res = await apiFetch('/admin/platos');
     if (res.ok) setPlatos(await res.json());
   };
 
   const cargarCategorias = async () => {
-    const res = await fetch('http://localhost:8000/admin/categorias');
+    const res = await apiFetch('/admin/categorias');
     if (res.ok) setCategorias(await res.json());
   };
 
   const guardarPlato = async (plato, esNuevo = false) => {
     // Saneamos espacios fantasma antes de que lleguen a PostgreSQL (rompen el cruce de nombres con el LLM)
     const platoSaneado = { ...plato, nombre: plato.nombre.trim() };
-    const url = esNuevo ? 'http://localhost:8000/admin/platos' : `http://localhost:8000/admin/platos/${plato.id_plato}`;
+    const url = esNuevo ? '/admin/platos' : `/admin/platos/${plato.id_plato}`;
     const method = esNuevo ? 'POST' : 'PUT';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(platoSaneado) });
+    const res = await apiFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(platoSaneado) });
     if (res.ok) {
       mostrarMensaje(esNuevo ? "✅ Plato creado" : "✅ Plato actualizado");
       cargarPlatos();
@@ -107,7 +108,7 @@ export default function AdminDashboard() {
 
   const eliminarPlato = async (plato) => {
     if (!window.confirm(`¿Estás seguro de que deseas eliminar "${plato.nombre}" del menú?`)) return;
-    const res = await fetch(`http://localhost:8000/admin/platos/${plato.id_plato}`, { method: 'DELETE' });
+    const res = await apiFetch(`/admin/platos/${plato.id_plato}`, { method: 'DELETE' });
     if (res.ok) {
       mostrarMensaje("🗑️ Plato eliminado del menú");
       setPlatos(prev => prev.filter(p => p.id_plato !== plato.id_plato));
@@ -116,7 +117,7 @@ export default function AdminDashboard() {
 
   // ================= API RECETAS =================
   const abrirReceta = async (plato) => {
-    const res = await fetch(`http://localhost:8000/admin/receta/${plato.id_plato}`);
+    const res = await apiFetch(`/admin/receta/${plato.id_plato}`);
     const data = res.ok ? await res.json() : [];
     setModalReceta({ visible: true, plato, ingredientesReceta: data });
   };
@@ -128,19 +129,19 @@ export default function AdminDashboard() {
       id_ingrediente: parseInt(nuevoIngReceta.id_ingrediente), 
       cantidad_base: parseFloat(nuevoIngReceta.cantidad_base) 
     };
-    await fetch('http://localhost:8000/admin/receta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    await apiFetch('/admin/receta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     abrirReceta(modalReceta.plato); 
   };
 
   const quitarDeReceta = async (id_ing) => {
-    await fetch(`http://localhost:8000/admin/receta/${modalReceta.plato.id_plato}/${id_ing}`, { method: 'DELETE' });
+    await apiFetch(`/admin/receta/${modalReceta.plato.id_plato}/${id_ing}`, { method: 'DELETE' });
     abrirReceta(modalReceta.plato);
   };
 
   // ================= GESTIÓN DE FOTOS =================
   const cargarPlatosGestion = async () => {
     try {
-      const res = await fetch('http://localhost:8000/admin/platos/todos');
+      const res = await apiFetch('/admin/platos/todos');
       if (res.ok) {
         const data = await res.json();
         setPlatosGestion(data.platos);
@@ -160,7 +161,7 @@ export default function AdminDashboard() {
     formData.append("imagen", file);
     
     try {
-      const res = await fetch(`http://localhost:8000/admin/platos/${id_plato}/imagen`, {
+      const res = await apiFetch(`/admin/platos/${id_plato}/imagen`, {
         method: 'POST',
         body: formData
       });
@@ -442,7 +443,7 @@ export default function AdminDashboard() {
                       const nuevaCant = parseFloat(e.target.value);
                       if(nuevaCant !== item.cantidad_base && !isNaN(nuevaCant)) {
                         const body = { id_plato: modalReceta.plato.id_plato, id_ingrediente: item.id_ingrediente, cantidad_base: nuevaCant };
-                        await fetch('http://localhost:8000/admin/receta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                        await apiFetch('/admin/receta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                         abrirReceta(modalReceta.plato);
                       }
                     }} 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css'; // O crea un Caja.css si quieres estilos separados
+import { apiFetch } from './utils/apiFetch';
 
 function Caja() {
     const [cuentas, setCuentas] = useState([]);
@@ -8,7 +9,7 @@ function Caja() {
    const cargarCuentas = () => {
         
         // 🌟 TRUCO: Date.now() obliga al navegador a pedir datos frescos siempre
-    fetch('http://127.0.0.1:8000/caja/pendientes?t=' + Date.now()) 
+    apiFetch('/caja/pendientes?t=' + Date.now()) 
       .then(res => res.json())
             .then(datos => {
                 // 🌟 EL ESPÍA: Imprime en consola lo que manda Python
@@ -40,7 +41,7 @@ function Caja() {
 
         if (confirmar) {
             try {
-                const respuesta = await fetch(`http://127.0.0.1:8000/caja/cobrar/${id_pedido}`, {
+                const respuesta = await apiFetch(`/caja/cobrar/${id_pedido}`, {
                     method: 'POST'
                 });
 

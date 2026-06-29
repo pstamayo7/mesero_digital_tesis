@@ -7,8 +7,14 @@ from fastapi import APIRouter, UploadFile, File, Depends, Form
 import shutil
 import os
 from app.core.database import get_db
+from app.core.seguridad import verificar_rol_requerido
 
-router = APIRouter(prefix="/admin", tags=["Administración"])
+# 🌟 RBAC: Administración es exclusiva del rol 'administrador'.
+router = APIRouter(
+    prefix="/admin",
+    tags=["Administración"],
+    dependencies=[Depends(verificar_rol_requerido(["administrador"]))],
+)
 
 # ==========================================
 # ESQUEMAS PYDANTIC

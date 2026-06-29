@@ -1,10 +1,12 @@
 import math
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from psycopg2.extras import RealDictCursor
 from app.core.database import get_db_connection
+from app.core.seguridad import verificar_rol_requerido
 from app.schemas.pedido_schema import ReporteProblemaCocina
 
-router = APIRouter()
+# 🌟 RBAC: Cocina es exclusiva de empleados y administradores.
+router = APIRouter(dependencies=[Depends(verificar_rol_requerido(["empleado", "administrador"]))])
 
 @router.get("/cocina/ordenes", tags=["Monitor de Cocina"])
 def obtener_ordenes_cocina():

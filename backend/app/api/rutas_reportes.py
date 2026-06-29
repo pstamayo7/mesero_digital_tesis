@@ -4,8 +4,10 @@ from psycopg2.extras import RealDictCursor
 from app.core.database import get_db
 from pydantic import BaseModel
 from app.services.ia_service import generar_analisis_negocio
+from app.core.seguridad import verificar_rol_requerido
 
-router = APIRouter()
+# 🌟 RBAC: se monta bajo /admin en main.py, así que es exclusivo de administradores.
+router = APIRouter(dependencies=[Depends(verificar_rol_requerido(["administrador"]))])
 
 class DatosAnalisis(BaseModel):
     kpis: dict

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './MonitorCocina.css'
+import { apiFetch } from './utils/apiFetch'
 
 function TemporizadorPedido({ fechaInicio, tiempoPrep }) {
   const [minutosRestantes, setMinutosRestantes] = useState('--')
@@ -68,7 +69,7 @@ function MonitorCocina() {
       return
     }
     setCargandoIngredientes(true)
-    fetch(`http://127.0.0.1:8000/menu/${itemReportando.id_plato}/ingredientes`)
+    apiFetch(`/menu/${itemReportando.id_plato}/ingredientes`)
       .then(res => res.json())
       .then(data => setIngredientesDelPlato(data.ingredientes_base || []))
       .catch(err => console.error("Error cargando receta del plato:", err))
@@ -76,7 +77,7 @@ function MonitorCocina() {
   }, [itemReportando])
 
   const cargarComandas = () => {
-    fetch('http://127.0.0.1:8000/cocina/ordenes')
+    apiFetch('/cocina/ordenes')
       .then(res => res.json())
       .then(datos => {
         const agrupadas = {}
@@ -125,14 +126,14 @@ function MonitorCocina() {
   }, [])
 
   const manejarAceptarPedido = async (id_pedido) => {
-    await fetch(`http://127.0.0.1:8000/cocina/pedido/preparar/${id_pedido}`, { method: 'POST' })
+    await apiFetch(`/cocina/pedido/preparar/${id_pedido}`, { method: 'POST' })
     cargarComandas()
   }
 
   const manejarRechazo = async (id_detalle) => {
     const confirmar = window.confirm("¿Seguro que deseas rechazar y eliminar este plato de la orden?")
     if (confirmar) {
-      await fetch(`http://127.0.0.1:8000/cocina/rechazar/${id_detalle}`, { method: 'POST' })
+      await apiFetch(`/cocina/rechazar/${id_detalle}`, { method: 'POST' })
       cargarComandas()
     }
   }
@@ -141,7 +142,7 @@ function MonitorCocina() {
     try {
       if (accion === 'LISTO') {
         // Hacemos la petición al backend
-        const respuesta = await fetch(`http://127.0.0.1:8000/cocina/entregar/${id_detalle}`, {
+        const respuesta = await apiFetch(`/cocina/entregar/${id_detalle}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -180,7 +181,7 @@ function MonitorCocina() {
         ingrediente_agotado: tipoProblema === 'FALTA_STOCK' ? ingredienteAgotado : null
       }
 
-      const respuesta = await fetch('http://127.0.0.1:8000/cocina/problema-item', {
+      const respuesta = await apiFetch('/cocina/problema-item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
