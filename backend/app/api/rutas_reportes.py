@@ -349,10 +349,15 @@ def obtener_ventas_periodo(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)
             dp.especificaciones_ia,
             p.nombre AS plato_nombre,
             COALESCE(dp.subtotal_calculado, 0) AS subtotal_calculado,
-            p.precio_base
+            p.precio_base,
+            -- 🌟 Trazabilidad: nombre del cajero que cerró el pedido (id_cajero,
+            -- ver migración 004). LEFT JOIN porque pedidos viejos (previos a esta
+            -- migración) no tienen cajero registrado: deben seguir apareciendo.
+            COALESCE(u.nombre_completo, u.username) AS cajero
         FROM Pedido pe
         JOIN Detalle_Pedido dp ON dp.id_pedido = pe.id_pedido
         JOIN Plato p ON dp.id_plato = p.id_plato
+        LEFT JOIN Usuario u ON u.id_usuario = pe.id_cajero
         WHERE pe.estado_pago = 'PAGADO'
           AND DATE(pe.fecha_apertura) BETWEEN %s AND %s
           AND dp.estado_item NOT IN ('CANCELADO', 'SUSPENDIDO')
@@ -377,7 +382,8 @@ def obtener_ventas_periodo(fecha_inicio: str, fecha_fin: str, db=Depends(get_db)
             })
 
             orden = dia["ordenes"].setdefault(fila["id_pedido"], {
-                "pedido_id": fila["id_pedido"], "hora": hora_str, "total_orden": 0.0, "detalles": []
+                "pedido_id": fila["id_pedido"], "hora": hora_str, "total_orden": 0.0,
+                "cajero": fila["cajero"], "detalles": []
             })
 
             orden["detalles"].append({

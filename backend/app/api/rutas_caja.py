@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from psycopg2.extras import RealDictCursor
 from app.core.database import get_db_connection
-from app.core.seguridad import verificar_rol_requerido
+from app.core.seguridad import obtener_usuario_actual, verificar_rol_requerido
 
 # 🌟 RBAC: Caja es exclusiva de empleados y administradores.
 router = APIRouter(dependencies=[Depends(verificar_rol_requerido(["empleado", "administrador"]))])
@@ -76,21 +76,24 @@ def obtener_cuentas_pendientes():
         if conn: conn.close()
 
 @router.post("/caja/cobrar/{id_pedido}", tags=["Caja y Facturación"])
-def cobrar_cuenta(id_pedido: int):
-    """Marca el pedido como PAGADO y libera la Mesa para un nuevo cliente"""
+def cobrar_cuenta(id_pedido: int, usuario_actual: dict = Depends(obtener_usuario_actual)):
+    """Marca el pedido como PAGADO, libera la Mesa para un nuevo cliente y
+    registra qué usuario hizo el cobro (id_cajero) para auditoría/reportes."""
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # 1. Marcar pedido como PAGADO y registrar hora de cierre
+
+        # 1. Marcar pedido como PAGADO, registrar hora de cierre y el cajero
+        # que lo procesó. usuario_actual["id_usuario"] viene directo del JWT,
+        # sin necesidad de una consulta extra a la tabla usuario.
         cursor.execute("""
-            UPDATE Pedido 
-            SET estado_pago = 'PAGADO', fecha_cierre = CURRENT_TIMESTAMP 
-            WHERE id_pedido = %s 
+            UPDATE Pedido
+            SET estado_pago = 'PAGADO', fecha_cierre = CURRENT_TIMESTAMP, id_cajero = %s
+            WHERE id_pedido = %s
             RETURNING id_mesa;
-        """, (id_pedido,))
+        """, (usuario_actual["id_usuario"], id_pedido))
         
         resultado = cursor.fetchone()
         if not resultado:

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminReportes from './AdminReportes'
+import GestionEmpleados from './GestionEmpleados'
 import { apiFetch } from './utils/apiFetch'
 
 export default function AdminDashboard() {
@@ -218,6 +219,7 @@ export default function AdminDashboard() {
           { id: 'platos', icono: '🍔', texto: 'Menú & Recetas' },
           { id: 'fotos', icono: '📸', texto: 'Fotos del Menú' }, // 👈 NUEVA PESTAÑA AQUÍ
           { id: 'ingredientes', icono: '📦', texto: 'Inventario' },
+          { id: 'empleados', icono: '👥', texto: 'Gestión de Personal' },
           { id: 'configuracion', icono: '🎛️', texto: 'Configuración' }
         ].map(item => (
           <button 
@@ -242,13 +244,14 @@ export default function AdminDashboard() {
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h1 style={{ color: '#0f172a', margin: 0, textTransform: 'capitalize' }}>
-          {tabActiva === 'reportes' ? 'Análisis de Datos' : tabActiva === 'platos' ? 'Gestión de Menú' : tabActiva === 'fotos' ? 'Fotografías del Menú' : tabActiva === 'ingredientes' ? 'Control de Stock' : 'Configuración'}
+          {tabActiva === 'reportes' ? 'Análisis de Datos' : tabActiva === 'platos' ? 'Gestión de Menú' : tabActiva === 'fotos' ? 'Fotografías del Menú' : tabActiva === 'ingredientes' ? 'Control de Stock' : tabActiva === 'empleados' ? 'Gestión de Personal' : 'Configuración'}
         </h1>
         {mensaje && <div style={{ backgroundColor: '#10b981', color: 'white', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', animation: 'fadeIn 0.5s' }}>{mensaje}</div>}
       </div>
 
       {/* --- INYECTAMOS LOS MÓDULOS AQUÍ --- */}
       {tabActiva === 'reportes' && <AdminReportes />}
+      {tabActiva === 'empleados' && <GestionEmpleados />}
       
       {/* ================= PESTAÑA: PLATOS ================= */}
       {tabActiva === 'platos' && (

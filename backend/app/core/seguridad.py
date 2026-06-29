@@ -44,7 +44,9 @@ def verificar_password(password_plano: str, password_hash: str) -> bool:
 # Tokens JWT
 # ---------------------------------------------------------------------------
 def crear_access_token(datos: dict, expires_delta: timedelta | None = None) -> str:
-    """`datos` debe incluir al menos {"sub": username, "rol": rol}."""
+    """`datos` debe incluir al menos {"sub": username, "rol": rol, "id_usuario": id}.
+    `id_usuario` viaja en el token para que endpoints como /caja/cobrar puedan
+    registrar quién hizo la transacción sin una consulta extra a la BD."""
     a_codificar = datos.copy()
     expira = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     a_codificar.update({"exp": expira})
@@ -63,8 +65,10 @@ def _credenciales_invalidas() -> HTTPException:
 # Dependencias de FastAPI
 # ---------------------------------------------------------------------------
 def obtener_usuario_actual(token: str | None = Depends(oauth2_scheme)) -> dict:
-    """Decodifica el JWT del header Authorization y devuelve {username, rol}.
-    Lanza 401 si no hay token o es inválido/expirado."""
+    """Decodifica el JWT del header Authorization y devuelve
+    {id_usuario, username, rol}. Lanza 401 si no hay token, es inválido/
+    expirado, o fue emitido antes de que el token incluyera id_usuario
+    (en ese caso basta con volver a iniciar sesión)."""
     if token is None:
         raise _credenciales_invalidas()
 
@@ -75,10 +79,11 @@ def obtener_usuario_actual(token: str | None = Depends(oauth2_scheme)) -> dict:
 
     username = payload.get("sub")
     rol = payload.get("rol")
-    if username is None or rol is None:
+    id_usuario = payload.get("id_usuario")
+    if username is None or rol is None or id_usuario is None:
         raise _credenciales_invalidas()
 
-    return {"username": username, "rol": rol}
+    return {"id_usuario": id_usuario, "username": username, "rol": rol}
 
 
 def verificar_rol_requerido(roles_permitidos: list[str]):

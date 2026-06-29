@@ -9,6 +9,7 @@ from app.api import rutas_caja
 from app.api import rutas_admin
 from app.api import rutas_reportes
 from app.api import rutas_auth
+from app.api import rutas_usuarios
 from fastapi.staticfiles import StaticFiles
 import os
 
@@ -55,6 +56,7 @@ app.include_router(rutas_caja.router)
 app.include_router(rutas_admin.router)
 app.include_router(rutas_reportes.router, prefix="/admin", tags=["Reportes"])
 app.include_router(rutas_auth.router)
+app.include_router(rutas_usuarios.router)
 @app.get("/", tags=["Estado"])
 def ruta_raiz():
     return {"mensaje": "¡El servidor de Fritadas Doña Zita está en línea!"}

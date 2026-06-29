@@ -482,6 +482,9 @@ export default function AdminReportes() {
                                       )}
                                     </div>
                                   ))}
+                                  <div style={{ marginTop: '10px', fontSize: '12px', color: '#94a3b8' }}>
+                                    💳 Cobrado por: <strong>{orden.cajero || 'Sin registrar'}</strong>
+                                  </div>
                                 </div>
                               )}
                             </div>

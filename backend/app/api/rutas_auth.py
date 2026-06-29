@@ -17,7 +17,7 @@ def login(credenciales: OAuth2PasswordRequestForm = Depends()):
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute(
-            "SELECT username, password_hash, rol FROM usuario WHERE username = %s AND activo = TRUE",
+            "SELECT id_usuario, username, password_hash, rol FROM usuario WHERE username = %s AND activo = TRUE",
             (credenciales.username,),
         )
         usuario = cursor.fetchone()
@@ -33,7 +33,13 @@ def login(credenciales: OAuth2PasswordRequestForm = Depends()):
     if not usuario or not verificar_password(credenciales.password, usuario["password_hash"]):
         raise credenciales_invalidas
 
-    access_token = crear_access_token({"sub": usuario["username"], "rol": usuario["rol"]})
+    # 🌟 id_usuario viaja en el token: permite registrar quién cobra cada
+    # pedido (id_cajero) sin una consulta extra a la BD en /caja/cobrar.
+    access_token = crear_access_token({
+        "sub": usuario["username"],
+        "rol": usuario["rol"],
+        "id_usuario": usuario["id_usuario"],
+    })
 
     return Token(
         access_token=access_token,
