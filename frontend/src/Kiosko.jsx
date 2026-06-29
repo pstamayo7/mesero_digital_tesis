@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import './App.css'
 import './BienvenidaPaleta.css'
+import './KioskoDonaZita.css'
 import ModalEdicionPlato from './ModalEdicionPlato.jsx'
 import SeleccionModalidad from './SeleccionModalidad.jsx'
 
@@ -133,7 +134,10 @@ function Kiosko() {
   // =====================================================================
   // CARRITO TÁCTIL (AHORA CON COSTEO MATEMÁTICO)
   // =====================================================================
-  const agregarAlCarrito = (platoNombre) => {
+  // 🌟 useCallback: mantiene la misma identidad de función mientras 'menu' no
+  // cambie, para que el grid de platos memoizado (más abajo) no se vuelva a
+  // calcular en cada tap del carrito y la interfaz se sienta más fluida.
+  const agregarAlCarrito = useCallback((platoNombre) => {
 
     setCarrito(prev => {
       const index = prev.findIndex(item => item.plato === platoNombre && !item.modificaciones);
@@ -165,7 +169,7 @@ function Kiosko() {
         subtotal: precioBase
       }];
     });
-  };
+  }, [menu]);
 
   const cambiarCantidad = (index, delta) => {
     setErrorStock(""); // Limpiamos la alerta si el usuario modifica el carrito a mano
@@ -398,6 +402,117 @@ function Kiosko() {
     }
   }
 
+  // 🌟 Botón "Volver": regresa a la pantalla inicial y limpia todo el estado del
+  // cliente actual (carrito, mesa, nombre, etc.) para que el siguiente cliente
+  // no herede un carrito ajeno.
+  const volverAlInicio = () => {
+    setCarrito([]);
+    setTranscripcion("");
+    setNumeroMesa(0);
+    setNombreCliente("");
+    setEsParaLlevar(false);
+    setErrorStock("");
+    setTiempoEstimado(null);
+    setItemEditando(null);
+    setPlatoViendoDetalle(null);
+    setMostrarTeclado(false);
+    setMensajeAnfitriona("");
+    setModalidadElegida(null);
+    setPasoActual(0);
+  }
+
+  // Helper puramente visual: elige un icono para el título de categoría según su nombre.
+  const iconoCategoria = (nombreCategoria) => {
+    const n = (nombreCategoria || "").toLowerCase();
+    if (n.includes("bebida") || n.includes("jugo") || n.includes("chicha")) return "🥤";
+    if (n.includes("postre") || n.includes("dulce")) return "🍮";
+    return "🍴";
+  };
+
+  // 🌟 useMemo: el grid de platos es lo más pesado de renderizar (imágenes,
+  // sombras, gradientes). Al depender solo de 'menu' y 'agregarAlCarrito'
+  // (ambos estables mientras no cambie el menú), React se salta por completo
+  // su reconciliación cuando el carrito/voz/scroll cambian otros estados.
+  // 🌟 IMPORTANTE: este hook debe llamarse siempre (antes de cualquier
+  // return condicional de pantalla), o React rompe las "Rules of Hooks".
+  const menuRenderizado = useMemo(() => (
+    menu.map((categoria) => {
+      const esCategoriaCompacta = categoria.platos.length === 1;
+      return (
+        <div key={categoria.id_categoria}>
+          <div className="dz-section-head">
+            <span className="dz-section-badge">{iconoCategoria(categoria.nombre)}</span>
+            <div>
+              <h2 className="dz-section-title">{categoria.nombre}</h2>
+              <div className="dz-section-rule" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {categoria.platos.map((plato) => {
+              const disponible = plato.disponible !== false; // por defecto disponible si el backend no manda el campo
+              return (
+                <div
+                  key={plato.id_plato}
+                  className={`dz-card ${esCategoriaCompacta ? 'dz-card--wide' : ''}`}
+                >
+                  {/* 🌟 tocar la foto o el título abre el modal de detalle. El botón
+                      "+" tiene su propio onClick con stopPropagation para no disparar esto. */}
+                  <button
+                    type="button"
+                    className="dz-card-media"
+                    onClick={() => setPlatoViendoDetalle(plato)}
+                    aria-label={`Ver ${plato.nombre}`}
+                  >
+                    <img
+                      src={`http://127.0.0.1:8000${plato.ruta_imagen || '/imagenes/default.png'}`}
+                      alt={plato.nombre}
+                      loading="lazy"
+                      decoding="async"
+                      className={disponible ? '' : 'is-out'}
+                    />
+                    {!disponible && (
+                      <div className="dz-out-overlay">
+                        <span className="dz-out-chip">🚫 Agotado por el momento</span>
+                      </div>
+                    )}
+                  </button>
+
+                  <div className="dz-card-body">
+                    <h3 className="dz-card-name" onClick={() => setPlatoViendoDetalle(plato)}>{plato.nombre}</h3>
+                    <p className="dz-card-time">🕒 {plato.descripcion}</p>
+                    {disponible ? (
+                      <span className="dz-card-price">${plato.precio.toFixed(2)}</span>
+                    ) : (
+                      <span className="dz-card-soldtext">Agotado temporalmente</span>
+                    )}
+                  </div>
+
+                  {disponible && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        agregarAlCarrito(plato.nombre);
+                        const boton = e.currentTarget;
+                        boton.classList.add('dz-pop');
+                        setTimeout(() => boton.classList.remove('dz-pop'), 420);
+                      }}
+                      title="Agregar"
+                      aria-label={`Agregar ${plato.nombre}`}
+                      className="dz-add"
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })
+  ), [menu, agregarAlCarrito]);
+
   // =====================================================================
   // 🌟 PANTALLA 0: SELECCIÓN DE MESA Y PARA LLEVAR (ACTUALIZADA)
   // =====================================================================
@@ -424,7 +539,7 @@ function Kiosko() {
 
         <button
           onClick={() => setModalidadElegida(null)}
-          className="self-start text-stone-500 font-semibold text-sm mb-2 hover:text-stone-800 transition-colors"
+          className="dz-back-pill"
         >
           ⬅️ Cambiar modalidad
         </button>
@@ -528,59 +643,70 @@ function Kiosko() {
   }
 
   // =====================================================================
-  // 🌟 PANTALLA 1: EL KIOSKO NORMAL (Mantenida)
+  // 🌟 PANTALLA 1: EL KIOSKO NORMAL (rediseñada visualmente)
   // =====================================================================
 
-  // Helper puramente visual: elige un icono para el título de categoría según su nombre.
-  const iconoCategoria = (nombreCategoria) => {
-    const n = (nombreCategoria || "").toLowerCase();
-    if (n.includes("bebida") || n.includes("jugo") || n.includes("chicha")) return "🥤";
-    if (n.includes("postre") || n.includes("dulce")) return "🍮";
-    return "🍴";
-  };
-
   return (
-    <div className="bg-amber-50 min-h-screen pb-10">
-      <div className="bg-red-900 rounded-b-[3rem] shadow-xl px-6 pt-5 pb-9 flex items-center justify-between text-white">
-        <div className="flex items-center gap-3">
-          <img
-            src="/logo.png"
-            alt="Logo Doña Zita"
-            className="w-20 h-20 object-cover rounded-full bg-amber-50 p-1 shadow-md shrink-0"
-          />
-          <div>
-            <h1 className="text-xl md:text-2xl font-serif font-black tracking-wide m-0">DOÑA ZITA</h1>
-            <p className="text-amber-300 italic text-sm m-0">la fritada más deliciosa</p>
+    <div className="dz-root pb-32">
+      {/* ============================ HEADER ============================ */}
+      <div className="sticky top-0 z-50">
+        <div className="dz-header px-6 pt-5 pb-9 flex items-center justify-between">
+          <div className="dz-header-pattern" />
+          <div className="relative flex items-center gap-3">
+            <img
+              src="/logo.png"
+              alt="Logo Doña Zita"
+              className="w-20 h-20 object-cover rounded-full bg-amber-50 p-1 shadow-md shrink-0"
+            />
+            <div>
+              <h1 className="text-xl md:text-2xl font-serif font-black tracking-wide m-0">DOÑA ZITA</h1>
+              <p className="text-amber-300 italic text-sm m-0">la fritada más deliciosa</p>
+            </div>
+          </div>
+          <div className="relative flex items-center gap-3">
+            <div className="dz-pill">
+              🪑 {esParaLlevar ? `Llevar: ${nombreCliente}` : `Paleta: ${numeroMesa}`}
+            </div>
+            <button
+              onClick={volverAlInicio}
+              className="dz-icon-btn"
+              title="Volver"
+              aria-label="Volver"
+            >
+              <span className="text-xl leading-none">←</span>
+            </button>
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="dz-icon-btn dz-icon-btn--solid relative"
+              title="Ver carrito"
+              aria-label="Ver carrito"
+            >
+              🛒
+              {totalPlatosPedido > 0 && <span key={totalPlatosPedido} className="dz-cart-count">{totalPlatosPedido}</span>}
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-amber-50 text-stone-800 font-bold rounded-full px-4 py-2 flex items-center gap-2 shadow-md whitespace-nowrap">
-            🪑 {esParaLlevar ? `Llevar: ${nombreCliente}` : `Paleta: ${numeroMesa}`}
-          </div>
-          <button
-            onClick={() => { setPasoActual(0); setModalidadElegida(null); setMostrarTeclado(false); setMensajeAnfitriona(""); }}
-            className="w-11 h-11 rounded-full bg-red-950 text-white flex items-center justify-center shadow-md transition-all duration-150 ease-out transform-gpu active:scale-95 hover:bg-red-800"
-            title="Cancelar"
-          >
-            🛒
-          </button>
-        </div>
-      </div>
 
-      <div className="flex justify-center -mt-6 mb-8 px-4">
-        <div className="relative">
-          <span className={`absolute inset-0 rounded-full bg-red-600 opacity-20 animate-ping duration-1000 ${grabando ? 'block' : 'hidden'}`} />
-          <span className="absolute inset-0 rounded-full bg-red-600 opacity-10 animate-pulse" />
-          <button
-            className={`relative rounded-full px-14 py-6 text-white font-bold text-2xl shadow-lg shadow-red-900/50 transition-all duration-100 ease-out select-none transform-gpu will-change-transform active:scale-95 hover:brightness-110 bg-gradient-to-r ${grabando ? 'from-red-600 to-red-800 animate-pulse' : 'from-red-700 to-red-900 hover:from-red-600 hover:to-red-800'}`}
-            onMouseDown={iniciarGrabacion}
-            onMouseUp={detenerGrabacion}
-            onTouchStart={iniciarGrabacion}
-            onTouchEnd={detenerGrabacion}
-          >
-            <span className="mr-3 text-3xl align-middle">{grabando ? "🎙️" : "🎤"}</span>
-            {grabando ? "Escuchando... (Suelta para enviar)" : "Mantén presionado para pedir"}
-          </button>
+        {/* ===================== BOTÓN DE VOZ + ONDAS ==================== */}
+        <div className="flex justify-center -mt-6 mb-2 px-4 pt-1">
+          <div className={`dz-voice-wrap ${grabando ? 'is-rec' : ''}`}>
+            <div className="dz-waves" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <button
+              className={`dz-voice ${grabando ? 'is-rec' : ''}`}
+              onMouseDown={iniciarGrabacion}
+              onMouseUp={detenerGrabacion}
+              onTouchStart={iniciarGrabacion}
+              onTouchEnd={detenerGrabacion}
+            >
+              <span className="text-2xl align-middle">{grabando ? "🎙️" : "🎤"}</span>
+              {grabando ? "Escuchando... (Suelta para enviar)" : "Mantén presionado para pedir"}
+            </button>
+            <div className="dz-waves" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -592,37 +718,38 @@ function Kiosko() {
         </div>
       )}
 
+      {/* ============================ CARRITO ============================ */}
       {carrito.length > 0 && (
-        <div className="carrito-contenedor" style={{ background: '#f8f9fa', padding: '20px', borderRadius: '10px', margin: '20px 0', border: '2px solid #28a745' }}>
-          <h2>🛒 Resumen de tu Pedido</h2>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
+        <div className="carrito-contenedor" style={{ background: '#fff', padding: '22px', borderRadius: '24px', margin: '22px 0', border: '1px solid #efe2cd', boxShadow: '0 18px 40px -28px rgba(72,28,14,0.5)' }}>
+          <h2 style={{ color: '#7d1620', fontWeight: 900, margin: '0 0 16px' }}>🛒 Resumen de tu Pedido</h2>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {carrito.map((item, index) => (
-              <li key={index} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #ccc', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <li key={index} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #f0e6d6', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
                   {/* NOMBRE Y PRECIO UNITARIO */}
                   <div style={{ flex: 2 }}>
-                    <strong style={{ fontSize: '1.2rem', display: 'block' }}>{item.plato}</strong>
-                    <span style={{ fontSize: '0.9rem', color: '#6b7280' }}>
+                    <strong style={{ fontSize: '1.2rem', display: 'block', color: '#2b2018' }}>{item.plato}</strong>
+                    <span style={{ fontSize: '0.9rem', color: '#8a7d6f' }}>
                       ${(item.precio_unitario || 0).toFixed(2)} c/u
                     </span>
                   </div>
 
                   {/* CONTROLES TÁCTILES DE CANTIDAD */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1, justifyContent: 'center' }}>
-                    <button onClick={() => cambiarCantidad(index, -1)} style={{ width: '40px', height: '40px', fontSize: '1.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>-</button>
-                    <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{item.cantidad}</span>
-                    <button onClick={() => cambiarCantidad(index, 1)} style={{ width: '40px', height: '40px', fontSize: '1.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>+</button>
+                    <button onClick={() => cambiarCantidad(index, -1)} style={{ width: '40px', height: '40px', fontSize: '1.5rem', backgroundColor: '#b22230', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>-</button>
+                    <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2b2018' }}>{item.cantidad}</span>
+                    <button onClick={() => cambiarCantidad(index, 1)} style={{ width: '40px', height: '40px', fontSize: '1.5rem', backgroundColor: '#7d1620', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>+</button>
                   </div>
 
                   {/* SUBTOTAL DE ESTE PLATO Y BOTONES */}
                   <div style={{ display: 'flex', gap: '10px', flex: 1.5, justifyContent: 'flex-end', alignItems: 'center' }}>
-                    <strong style={{ fontSize: '1.3rem', color: '#059669', marginRight: '10px' }}>
+                    <strong style={{ fontSize: '1.3rem', color: '#b22230', marginRight: '10px' }}>
                       ${(item.subtotal || 0).toFixed(2)}
                     </strong>
-                    <button onClick={() => abrirModalEdicion(index)} style={{ padding: '8px 12px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>📝</button>
-                    <button onClick={() => eliminarDelCarrito(index)} style={{ padding: '8px 12px', backgroundColor: '#6b7280', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>🗑️</button>
+                    <button onClick={() => abrirModalEdicion(index)} style={{ padding: '8px 12px', backgroundColor: '#e6a817', color: '#5e0f18', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>📝</button>
+                    <button onClick={() => eliminarDelCarrito(index)} style={{ padding: '8px 12px', backgroundColor: '#8a7d6f', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>🗑️</button>
                   </div>
                 </div>
 
@@ -648,34 +775,34 @@ function Kiosko() {
 
             {/* ESTIMADOR DE TIEMPO */}
             {tiempoEstimado > 0 && (
-              <div style={{ background: '#e9ecef', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #ced4da' }}>
-                <span style={{ fontSize: '1.2rem', color: '#495057', display: 'block', marginBottom: '5px' }}>
+              <div style={{ background: '#fbf4e6', padding: '15px', borderRadius: '14px', marginBottom: '15px', textAlign: 'center', border: '1px solid #efe2cd' }}>
+                <span style={{ fontSize: '1.1rem', color: '#6b5d4d', display: 'block', marginBottom: '5px' }}>
                   Tu pedido entrará en cola de producción
                 </span>
-                <span style={{ fontSize: '1.4rem', color: '#d97706', fontWeight: 'bold' }}>
+                <span style={{ fontSize: '1.4rem', color: '#b22230', fontWeight: 'bold' }}>
                   ⏱️ Tiempo estimado: {tiempoEstimado} - {tiempoEstimado + 5} minutos
                 </span>
               </div>
             )}
           </ul>
 
-          {/* 🌟 NUEVO: EL GRAN TOTAL EN DÓLARES 🌟 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e2e8f0', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #cbd5e1' }}>
-            <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#1e293b' }}>Total a Pagar:</h3>
-            <span style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#10b981' }}>
+          {/* 🌟 EL GRAN TOTAL EN DÓLARES 🌟 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#7d1620', padding: '16px 20px', borderRadius: '16px', marginBottom: '15px' }}>
+            <h3 style={{ margin: 0, fontSize: '1.4rem', color: '#fff', fontWeight: 800 }}>Total a Pagar:</h3>
+            <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f3c64d' }}>
               ${carrito.reduce((suma, item) => suma + (item.subtotal || 0), 0).toFixed(2)}
             </span>
           </div>
-          {/* 🌟 NUEVO: ALERTA ROJA DE STOCK */}
+          {/* 🌟 ALERTA ROJA DE STOCK */}
           {errorStock && (
-            <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #f87171' }}>
+            <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '15px', borderRadius: '14px', marginBottom: '15px', textAlign: 'center', border: '1px solid #f87171' }}>
               <strong>🚫 ¡Bodega Insuficiente!</strong> <br />
               {errorStock} <br />
               El carrito ha sido revertido a su estado anterior.
             </div>
           )}
           {excedeLimite && (
-            <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '15px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #f87171' }}>
+            <div style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '15px', borderRadius: '14px', marginBottom: '15px', textAlign: 'center', border: '1px solid #fcd34d' }}>
               <strong>⚠️ ¡Qué gran apetito!</strong> <br />
               Tu pedido contiene {totalPlatosPedido} ítems. Para garantizar la frescura y rapidez, el kiosko automático procesa un máximo de <strong>{limitePlatos} ítems</strong>. <br />
               Para pedidos masivos o corporativos, por favor acércate a la caja principal.
@@ -684,85 +811,63 @@ function Kiosko() {
 
           <button
             onClick={confirmarOrden}
-            disabled={excedeLimite || !!errorStock} // 🌟 NUEVO: Se bloquea si no hay stock
-            style={{ width: '100%', padding: '15px', backgroundColor: (excedeLimite || !!errorStock) ? '#9ca3af' : '#10b981', color: 'white', fontSize: '1.2rem', fontWeight: 'bold', border: 'none', borderRadius: '8px', cursor: (excedeLimite || !!errorStock) ? 'not-allowed' : 'pointer' }}
+            disabled={excedeLimite || !!errorStock} // 🌟 Se bloquea si no hay stock
+            style={{ width: '100%', padding: '16px', backgroundColor: (excedeLimite || !!errorStock) ? '#cbb9a3' : '#7d1620', color: 'white', fontSize: '1.2rem', fontWeight: 'bold', border: 'none', borderRadius: '14px', cursor: (excedeLimite || !!errorStock) ? 'not-allowed' : 'pointer' }}
           >
             {excedeLimite ? 'Límite Excedido' : errorStock ? 'Revisa el Stock' : 'Confirmar Orden'}
           </button>
         </div>
       )}
 
+      {/* ============================ MENÚ ============================ */}
       {cargando ? (
         <p className="text-center text-stone-500 text-lg py-10">Encendiendo los fogones (Cargando menú)...</p>
       ) : (
         <div>
-          {menu.map((categoria) => {
-            const esCategoriaCompacta = categoria.platos.length === 1;
-            return (
-              <div key={categoria.id_categoria} className="mt-8">
-                <div className="flex items-center gap-2 text-red-900 font-bold text-xl border-b-2 border-amber-600 w-max pb-1 mb-5">
-                  <span>{iconoCategoria(categoria.nombre)}</span>
-                  <h2 className="m-0 uppercase">{categoria.nombre}</h2>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                  {categoria.platos.map((plato) => {
-                    const disponible = plato.disponible !== false; // por defecto disponible si el backend no manda el campo
-                    return (
-                      <div
-                        key={plato.id_plato}
-                        className={`bg-white rounded-2xl shadow-md transition-all duration-200 ease-out transform-gpu will-change-transform hover:-translate-y-1 hover:shadow-xl overflow-hidden flex ${esCategoriaCompacta ? 'col-span-2 md:col-span-3 flex-row' : 'flex-col'}`}
-                      >
-                        {/* 🌟 FASE 3: tocar la foto o el título abre el modal de detalle. El botón
-                            "Agregar +" tiene su propio onClick con stopPropagation para no disparar esto. */}
-                        <div
-                          className={`relative cursor-pointer shrink-0 ${esCategoriaCompacta ? 'w-1/3' : 'w-full'}`}
-                          onClick={() => setPlatoViendoDetalle(plato)}
-                        >
-                          <img
-                            src={`http://127.0.0.1:8000${plato.ruta_imagen || '/imagenes/default.png'}`}
-                            alt={plato.nombre}
-                            className={`object-cover ${esCategoriaCompacta ? 'w-full h-full' : 'w-full h-40'} ${disponible ? '' : 'grayscale'}`}
-                          />
-                          {!disponible && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                              <span className="bg-stone-800 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md text-center">
-                                🚫 Agotado por el momento
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-4 flex flex-col flex-1">
-                          <h3 className="text-lg font-bold text-stone-800 m-0 cursor-pointer" onClick={() => setPlatoViendoDetalle(plato)}>{plato.nombre}</h3>
-                          <p className="text-sm text-stone-500 mb-3">🕒 {plato.descripcion}</p>
-                          <div className="flex justify-between items-center mt-auto">
-                            {disponible ? (
-                              <>
-                                <span className="text-red-700 font-bold text-xl">${plato.precio.toFixed(2)}</span>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); agregarAlCarrito(plato.nombre); }}
-                                  className="bg-red-900 text-white rounded-full px-4 py-1.5 text-sm font-semibold transition-all duration-150 ease-out transform-gpu active:scale-95 hover:bg-red-800"
-                                >
-                                  Agregar +
-                                </button>
-                              </>
-                            ) : (
-                              <span className="text-stone-500 italic text-sm">
-                                Agotado temporalmente
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+          {menuRenderizado}
         </div>
       )}
 
       </div>
+
+      {/* ===================== BARRA DE CONFIANZA ===================== */}
+      <div className="dz-trust">
+        <div className="dz-trust-inner">
+          <div className="dz-trust-item">
+            <span className="dz-trust-ico">🎙️</span>
+            <div>
+              <div className="dz-trust-strong">Pide por voz</div>
+              <div className="dz-trust-soft">Rápido y fácil</div>
+            </div>
+          </div>
+          <div className="dz-trust-item">
+            <span className="dz-trust-ico">🛡️</span>
+            <div>
+              <div className="dz-trust-strong">Ingredientes frescos</div>
+              <div className="dz-trust-soft">Calidad garantizada</div>
+            </div>
+          </div>
+          <div className="dz-trust-item">
+            <span className="dz-trust-ico">❤️</span>
+            <div>
+              <div className="dz-trust-strong">Hecho con amor</div>
+              <div className="dz-trust-soft">Tradición que se saborea</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===================== BARRA FLOTANTE CARRITO ===================== */}
+      {carrito.length > 0 && (
+        <div className="dz-cta-bar">
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="dz-cta"
+          >
+            🛒 IR AL CARRITO ({totalPlatosPedido})
+          </button>
+        </div>
+      )}
 
       {itemEditando && (
         <ModalEdicionPlato
@@ -775,7 +880,7 @@ function Kiosko() {
         />
       )}
 
-      {/* 🌟 FASE 4: MODAL DE DETALLE DE PLATO (solo informativo + acceso rápido al carrito) */}
+      {/* 🌟 MODAL DE DETALLE DE PLATO (solo informativo + acceso rápido al carrito) */}
       {platoViendoDetalle && (
         <div className="modal-overlay" onClick={() => setPlatoViendoDetalle(null)}>
           <div className="modal-detalle-plato" onClick={(e) => e.stopPropagation()}>
@@ -810,9 +915,10 @@ function Kiosko() {
               <button
                 className="modal-btn-agregar"
                 disabled={platoViendoDetalle.disponible === false}
-                onClick={() => {
+                onClick={(e) => {
                   agregarAlCarrito(platoViendoDetalle.nombre);
-                  setPlatoViendoDetalle(null);
+                  e.currentTarget.classList.add('dz-pop-soft');
+                  setTimeout(() => setPlatoViendoDetalle(null), 220);
                 }}
               >
                 {platoViendoDetalle.disponible === false ? 'Agotado por el momento' : 'Agregar al Carrito'}

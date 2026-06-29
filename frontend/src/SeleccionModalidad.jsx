@@ -7,20 +7,23 @@ function SeleccionModalidad({ onSeleccion }) {
   return (
     <div className="relative h-screen w-full overflow-hidden bg-stone-900">
       {/* ===================================================================== */}
-      {/* HERO: 60% superior con la imagen apetitosa de la fritada */}
+      {/* HERO: 60% superior con la imagen apetitosa de la fritada.
+          bg-gradient de respaldo: si promo-fritada.jpg aún no existe o falla
+          al cargar, queda un fondo de marca en vez de un ícono de imagen rota. */}
       {/* ===================================================================== */}
-      <div className="absolute inset-0 h-[60%] w-full">
+      <div className="absolute inset-0 h-[60%] w-full bg-gradient-to-br from-red-900 to-red-950">
         <img
           src="/promo-fritada.jpg"
           alt="Fritada Doña Zita"
-          className="h-full w-full object-cover"
+          loading="eager"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
 
         <div className="absolute inset-x-0 bottom-0 px-8 pb-10">
-          <p className="font-serif italic text-amber-300 text-2xl drop-shadow-md">
-            ¡Sabor que enamora!
-          </p>
+        
           <h1 className="font-black italic text-white text-5xl leading-tight tracking-tight drop-shadow-lg">
             LA MEJOR FRITADA
           </h1>

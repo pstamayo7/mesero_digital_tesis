@@ -1,0 +1,526 @@
+/* =====================================================================
+   DOÑA ZITA · Capa de diseño
+   Tokens + piezas visuales custom. NO toca ninguna lógica del sistema.
+   Filosofía de animación: Emil Kowalski (curvas fuertes, ease-out,
+   feedback en :active, <300ms, respeta prefers-reduced-motion).
+   ===================================================================== */
+
+:root {
+  /* Marca */
+  --dz-red-950: #5e0f18;
+  --dz-red-900: #7d1620;
+  --dz-red-800: #951c26;
+  --dz-red-700: #b22230;
+  --dz-gold: #e6a817;
+  --dz-gold-soft: #f3c64d;
+  --dz-cream: #fdf7ec;
+  --dz-cream-2: #f6ecd9;
+  --dz-ink: #2b2018;
+  --dz-ink-soft: #8a7d6f;
+
+  /* Easings fuertes (los nativos no tienen "punch") */
+  --dz-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dz-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dz-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ----------------------------------------------------------------- */
+/* Lienzo                                                            */
+/* ----------------------------------------------------------------- */
+.dz-root {
+  background:
+    radial-gradient(1200px 480px at 50% -120px, #fff8ec 0%, transparent 60%),
+    var(--dz-cream);
+  min-height: 100vh;
+}
+
+/* ----------------------------------------------------------------- */
+/* Header con curva inferior + textura sutil                         */
+/* ----------------------------------------------------------------- */
+.dz-header {
+  position: relative;
+  background:
+    radial-gradient(900px 300px at 85% -40%, rgba(255,255,255,0.10), transparent 60%),
+    linear-gradient(160deg, var(--dz-red-800) 0%, var(--dz-red-950) 100%);
+  color: #fff;
+  border-bottom-left-radius: 44px;
+  border-bottom-right-radius: 44px;
+  box-shadow: 0 18px 40px -22px rgba(94, 15, 24, 0.65);
+  overflow: hidden;
+}
+
+/* Línea dorada finísima que recorre la curva: detalle que se nota en conjunto */
+.dz-header::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(230,168,23,0.55), transparent);
+}
+
+/* Patrón de íconos de comida muy tenue al fondo del header */
+.dz-header-pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2'%3E%3Ccircle cx='30' cy='30' r='14'/%3E%3Cpath d='M80 20v22M86 20v22M92 20v22M86 42c8 0 8 22 0 22'/%3E%3Cpath d='M22 86c0-9 7-16 16-16s16 7 16 16'/%3E%3Ccircle cx='90' cy='92' r='10'/%3E%3C/g%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* Pastilla "Paleta / Llevar" */
+.dz-pill {
+  background: var(--dz-cream);
+  color: var(--dz-ink);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 18px -10px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
+
+/* Botón circular (carrito / volver) en el header */
+.dz-icon-btn {
+  width: 48px; height: 48px;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; cursor: pointer;
+  background: var(--dz-cream);
+  color: var(--dz-red-900);
+  font-weight: 800;
+  box-shadow: 0 8px 18px -10px rgba(0,0,0,0.5);
+  transition: transform 160ms var(--dz-ease-out), background-color 200ms ease;
+  transform: translateZ(0);
+}
+.dz-icon-btn:active { transform: scale(0.94); }
+@media (hover: hover) and (pointer: fine) {
+  .dz-icon-btn:hover { background: #fff; }
+}
+.dz-icon-btn--solid {
+  background: linear-gradient(160deg, var(--dz-red-700), var(--dz-red-900));
+  color: #fff;
+}
+
+.dz-cart-count {
+  position: absolute;
+  top: -4px; right: -4px;
+  background: var(--dz-gold);
+  color: var(--dz-red-950);
+  font-size: 11px; font-weight: 900;
+  min-width: 20px; height: 20px;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 5px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* ----------------------------------------------------------------- */
+/* Botón de voz "glossy" + ondas de sonido                           */
+/* ----------------------------------------------------------------- */
+.dz-voice-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.dz-voice {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 40px;
+  border: none;
+  cursor: pointer;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: 0.2px;
+  background: linear-gradient(170deg, var(--dz-red-700), var(--dz-red-950));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 16px 32px -16px rgba(94,15,24,0.8);
+  transition: transform 150ms var(--dz-ease-out), box-shadow 200ms ease;
+  transform: translateZ(0);
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Brillo superior tipo cristal */
+.dz-voice::before {
+  content: "";
+  position: absolute;
+  top: 4px; left: 12px; right: 12px;
+  height: 42%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.22), transparent);
+  pointer-events: none;
+}
+.dz-voice:active { transform: scale(0.97); }
+.dz-voice.is-rec {
+  background: linear-gradient(170deg, var(--dz-red-700), var(--dz-red-800));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    0 0 0 6px rgba(178,34,48,0.18),
+    0 16px 32px -14px rgba(94,15,24,0.85);
+}
+
+/* Ondas de sonido (decorativas, idle suave) */
+.dz-waves {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+}
+.dz-waves span {
+  width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--dz-gold), var(--dz-red-700));
+  opacity: 0.55;
+  animation: dz-wave 1.4s var(--dz-ease-in-out) infinite;
+}
+.dz-waves span:nth-child(1) { height: 12px; animation-delay: 0ms; }
+.dz-waves span:nth-child(2) { height: 22px; animation-delay: 120ms; }
+.dz-waves span:nth-child(3) { height: 32px; animation-delay: 240ms; }
+.dz-waves span:nth-child(4) { height: 20px; animation-delay: 360ms; }
+.dz-waves span:nth-child(5) { height: 10px; animation-delay: 480ms; }
+.dz-voice-wrap.is-rec .dz-waves span { opacity: 0.9; animation-duration: 0.6s; }
+
+@keyframes dz-wave {
+  0%, 100% { transform: scaleY(0.55); }
+  50%      { transform: scaleY(1); }
+}
+
+/* ----------------------------------------------------------------- */
+/* Cabecera de sección: badge + título + subrayado dorado            */
+/* ----------------------------------------------------------------- */
+.dz-section-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 36px 0 22px;
+}
+.dz-section-badge {
+  width: 46px; height: 46px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.25rem;
+  background: var(--dz-cream);
+  border: 2px solid rgba(230,168,23,0.55);
+  box-shadow: 0 6px 14px -10px rgba(125,22,32,0.6);
+}
+.dz-section-title {
+  margin: 0;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--dz-red-900);
+  font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+  line-height: 1.05;
+}
+.dz-section-rule {
+  height: 4px;
+  width: clamp(120px, 60%, 240px);
+  margin-top: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--dz-gold), var(--dz-red-700) 70%, transparent);
+}
+
+/* ----------------------------------------------------------------- */
+/* Tarjeta de plato (foto izquierda, contenido derecha, + flotante)  */
+/* ----------------------------------------------------------------- */
+.dz-card {
+  position: relative;
+  display: flex;
+  background: #fff;
+  border-radius: 26px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px -20px rgba(72, 28, 14, 0.55);
+  transition: transform 240ms var(--dz-ease-out), box-shadow 240ms var(--dz-ease-out);
+  transform: translateZ(0);
+  /* El navegador se salta layout/paint de tarjetas fuera de pantalla:
+     en menús largos esto evita el "trabado" al hacer scroll. */
+  content-visibility: auto;
+  contain-intrinsic-size: 0 230px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .dz-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 40px -22px rgba(72, 28, 14, 0.55);
+  }
+}
+
+.dz-card-media {
+  position: relative;
+  width: 42%;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  background: var(--dz-cream-2);
+  overflow: hidden;
+}
+.dz-card-media img {
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  object-fit: cover;
+  display: block;
+  transition: transform 400ms var(--dz-ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .dz-card:hover .dz-card-media img { transform: scale(1.05); }
+}
+.dz-card-media img.is-out { filter: grayscale(100%); }
+
+.dz-out-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(43, 32, 24, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 8px;
+}
+.dz-out-chip {
+  background: var(--dz-ink);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  box-shadow: 0 6px 14px -8px rgba(0,0,0,0.6);
+}
+
+.dz-card-body {
+  flex: 1;
+  padding: 16px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dz-card-name {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.06rem;
+  color: var(--dz-ink);
+  line-height: 1.15;
+  cursor: pointer;
+}
+.dz-card-time {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--dz-ink-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.dz-card-desc {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--dz-ink-soft);
+  line-height: 1.35;
+}
+.dz-card-price {
+  margin-top: auto;
+  padding-top: 12px;
+  color: var(--dz-red-700);
+  font-weight: 900;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+.dz-card-soldtext {
+  margin-top: auto;
+  padding-top: 12px;
+  color: var(--dz-ink-soft);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* Botón "+" flotante, esquina inferior derecha de la tarjeta */
+.dz-add {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  width: 46px; height: 46px;
+  border-radius: 999px;
+  border: 3px solid #fff;
+  cursor: pointer;
+  background: linear-gradient(160deg, var(--dz-red-700), var(--dz-red-900));
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 20px -10px rgba(125,22,32,0.9);
+  transition: transform 150ms var(--dz-ease-out), filter 200ms ease;
+  transform: translateZ(0);
+}
+.dz-add:active { transform: scale(0.9); }
+@media (hover: hover) and (pointer: fine) {
+  .dz-add:hover { filter: brightness(1.08); }
+}
+
+/* Variante ancha (categoría de un solo plato, p.ej. bebidas) */
+.dz-card--wide { grid-column: 1 / -1; }
+.dz-card--wide .dz-card-media { width: 38%; }
+.dz-card--wide .dz-card-media img { min-height: 200px; }
+
+/* Entrada escalonada y suave de las tarjetas */
+.dz-card {
+  animation: dz-card-in 360ms var(--dz-ease-out) both;
+}
+@keyframes dz-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ----------------------------------------------------------------- */
+/* Barra de confianza (pie)                                          */
+/* ----------------------------------------------------------------- */
+.dz-trust {
+  margin-top: 40px;
+  background: linear-gradient(160deg, var(--dz-red-800), var(--dz-red-950));
+  color: #fff;
+  border-top-left-radius: 40px;
+  border-top-right-radius: 40px;
+  padding: 26px 18px 30px;
+}
+.dz-trust-inner {
+  max-width: 880px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.dz-trust-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+.dz-trust-ico {
+  width: 46px; height: 46px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.2rem;
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(243,198,77,0.5);
+}
+.dz-trust-strong { font-weight: 800; line-height: 1.1; }
+.dz-trust-soft { font-size: 0.82rem; color: rgba(255,255,255,0.7); }
+@media (max-width: 640px) {
+  .dz-trust-inner { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------------- */
+/* Barra flotante "IR AL CARRITO"                                    */
+/* ----------------------------------------------------------------- */
+.dz-cta-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  padding: 16px;
+  z-index: 50;
+  background: linear-gradient(to top, var(--dz-cream) 35%, transparent);
+  animation: dz-cta-in 300ms var(--dz-ease-out) both;
+}
+@keyframes dz-cta-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dz-cta {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  height: 62px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  border: none; cursor: pointer;
+  border-radius: 20px;
+  font-size: 1.2rem; font-weight: 800;
+  color: #fff;
+  background: linear-gradient(160deg, var(--dz-red-700), var(--dz-red-900));
+  box-shadow: 0 18px 34px -16px rgba(125,22,32,0.85);
+  transition: transform 150ms var(--dz-ease-out), filter 200ms ease;
+  transform: translateZ(0);
+}
+.dz-cta:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .dz-cta:hover { filter: brightness(1.06); }
+}
+
+/* ----------------------------------------------------------------- */
+/* Feedback táctil al agregar un plato al carrito ("+" y modal)      */
+/* ----------------------------------------------------------------- */
+@keyframes dz-add-pop {
+  0%   { transform: scale(1) rotate(0deg); }
+  35%  { transform: scale(1.35) rotate(-10deg); background: linear-gradient(160deg, var(--dz-gold), var(--dz-gold-soft)); box-shadow: 0 0 0 10px rgba(230,168,23,0.25); }
+  70%  { transform: scale(0.9) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.dz-add.dz-pop { animation: dz-add-pop 420ms var(--dz-ease-out); }
+
+@keyframes dz-flash-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.04); filter: brightness(1.25); }
+  100% { transform: scale(1); }
+}
+.dz-pop-soft { animation: dz-flash-pop 360ms var(--dz-ease-out); }
+
+/* El badge del carrito "rebota" cada vez que cambia la cantidad (se
+   retrigerea remontando el nodo con key={totalPlatosPedido}) */
+.dz-cart-count {
+  animation: dz-bump 360ms var(--dz-ease-out);
+}
+@keyframes dz-bump {
+  0%   { transform: scale(0.4); }
+  55%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* ----------------------------------------------------------------- */
+/* Chip "Cambiar modalidad": antes era un link casi invisible         */
+/* ----------------------------------------------------------------- */
+.dz-back-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  margin-bottom: 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--dz-gold);
+  background: var(--dz-cream);
+  color: var(--dz-red-900);
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 8px 18px -12px rgba(125,22,32,0.45);
+  transition: transform 160ms var(--dz-ease-out), box-shadow 200ms ease, background-color 200ms ease;
+  transform: translateZ(0);
+}
+.dz-back-pill:active { transform: scale(0.95); }
+@media (hover: hover) and (pointer: fine) {
+  .dz-back-pill:hover { background: #fff; box-shadow: 0 12px 22px -12px rgba(125,22,32,0.55); }
+}
+
+/* ----------------------------------------------------------------- */
+/* Accesibilidad: menos movimiento                                   */
+/* ----------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .dz-waves span { animation: none; }
+  .dz-card { animation: none; }
+  .dz-cta-bar { animation: none; }
+  .dz-cart-count { animation: none; }
+  .dz-add.dz-pop,
+  .dz-pop-soft { animation: none; }
+  .dz-card-media img,
+  .dz-card,
+  .dz-add,
+  .dz-voice,
+  .dz-icon-btn,
+  .dz-back-pill,
+  .dz-cta { transition: opacity 150ms ease, background-color 150ms ease; }
+}
