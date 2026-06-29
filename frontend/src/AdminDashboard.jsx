@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import AdminReportes from './AdminReportes'
 import GestionEmpleados from './GestionEmpleados'
 import { apiFetch } from './utils/apiFetch'
+import './OpsTheme.css'
+import {
+  BarChart3, Camera, Check, ChefHat, Package, Pencil,
+  SlidersHorizontal, Trash2, UtensilsCrossed, Users, X
+} from 'lucide-react'
 
 export default function AdminDashboard() {
   const [tabActiva, setTabActiva] = useState('platos');
@@ -50,7 +55,7 @@ export default function AdminDashboard() {
   const guardarConfiguracion = async (e) => {
     e.preventDefault();
     const res = await apiFetch('/admin/configuracion', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
-    if (res.ok) mostrarMensaje("✅ Configuración guardada correctamente");
+    if (res.ok) mostrarMensaje("Configuración guardada correctamente");
   };
 
   const cargarIngredientes = async () => {
@@ -65,7 +70,7 @@ export default function AdminDashboard() {
     const method = esNuevo ? 'POST' : 'PUT';
     const res = await apiFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ingSaneado) });
     if (res.ok) {
-      mostrarMensaje(esNuevo ? "✅ Ingrediente agregado" : "✅ Ingrediente actualizado");
+      mostrarMensaje(esNuevo ? "Ingrediente agregado" : "Ingrediente actualizado");
       cargarIngredientes();
     }
   };
@@ -87,7 +92,7 @@ export default function AdminDashboard() {
     const method = esNuevo ? 'POST' : 'PUT';
     const res = await apiFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(platoSaneado) });
     if (res.ok) {
-      mostrarMensaje(esNuevo ? "✅ Plato creado" : "✅ Plato actualizado");
+      mostrarMensaje(esNuevo ? "Plato creado" : "Plato actualizado");
       cargarPlatos();
     }
   };
@@ -111,7 +116,7 @@ export default function AdminDashboard() {
     if (!window.confirm(`¿Estás seguro de que deseas eliminar "${plato.nombre}" del menú?`)) return;
     const res = await apiFetch(`/admin/platos/${plato.id_plato}`, { method: 'DELETE' });
     if (res.ok) {
-      mostrarMensaje("🗑️ Plato eliminado del menú");
+      mostrarMensaje("Plato eliminado del menú");
       setPlatos(prev => prev.filter(p => p.id_plato !== plato.id_plato));
     }
   };
@@ -167,7 +172,7 @@ export default function AdminDashboard() {
         body: formData
       });
       if (res.ok) {
-        mostrarMensaje("✅ ¡Imagen actualizada con éxito!");
+        mostrarMensaje("Imagen actualizada con éxito");
         cargarPlatosGestion(); // Recargamos para ver la nueva foto
       }
     } catch (error) {
@@ -192,61 +197,78 @@ export default function AdminDashboard() {
     }
   };
 
-  // ================= ESTILOS MODERNOS =================
+  // ================= ESTILOS DEL SISTEMA "OPERACIONES" =================
   const theme = {
-    card: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', marginBottom: '20px' },
-    input: { padding: '10px', borderRadius: '6px', border: '1px solid #ddd', width: '100%', boxSizing: 'border-box', outline: 'none' },
-    btnPrimary: { backgroundColor: '#10b981', color: 'white', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', transition: '0.2s' },
-    btnSecondary: { backgroundColor: '#f1f5f9', color: '#334155', padding: '10px 16px', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', transition: '0.2s' },
-    th: { textAlign: 'left', padding: '12px', backgroundColor: '#f8fafc', color: '#475569', borderBottom: '2px solid #e2e8f0' },
-    td: { padding: '12px', borderBottom: '1px solid #e2e8f0' }
+    card: { backgroundColor: 'var(--ops-surface)', borderRadius: 'var(--ops-radius)', padding: '24px', border: '1px solid var(--ops-border)', boxShadow: 'var(--ops-shadow-sm)', marginBottom: '20px' },
+    input: { padding: '10px', borderRadius: 'var(--ops-radius-sm)', border: '1px solid var(--ops-border)', width: '100%', boxSizing: 'border-box', outline: 'none', fontFamily: 'var(--ops-font-body)' },
+    btnPrimary: { display: 'inline-flex', alignItems: 'center', gap: '7px', backgroundColor: 'var(--ops-accent)', color: 'var(--ops-accent-contrast)', padding: '10px 16px', border: 'none', borderRadius: 'var(--ops-radius-sm)', cursor: 'pointer', fontWeight: 600, transition: 'transform 160ms var(--ops-ease), filter 160ms ease' },
+    btnSecondary: { display: 'inline-flex', alignItems: 'center', gap: '7px', backgroundColor: 'var(--ops-surface-alt)', color: 'var(--ops-ink)', padding: '10px 16px', border: '1px solid var(--ops-border)', borderRadius: 'var(--ops-radius-sm)', cursor: 'pointer', fontWeight: 600, transition: 'transform 160ms var(--ops-ease), filter 160ms ease' },
+    th: { textAlign: 'left', padding: '12px', backgroundColor: 'var(--ops-surface-alt)', color: 'var(--ops-ink-soft)', borderBottom: '1px solid var(--ops-border)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.3px' },
+    td: { padding: '12px', borderBottom: '1px solid var(--ops-border)' }
+  };
+
+  const iconosTab = {
+    reportes: BarChart3, platos: UtensilsCrossed, fotos: Camera,
+    ingredientes: Package, empleados: Users, configuracion: SlidersHorizontal,
   };
 
   return (
-  <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: '"Inter", sans-serif' }}>
-    
+  <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--ops-surface-alt)', fontFamily: 'var(--ops-font-body)' }}>
+
     {/* ================= ASIDE (BARRA LATERAL) ================= */}
-    <aside style={{ width: '260px', backgroundColor: '#1e293b', color: 'white', display: 'flex', flexDirection: 'column', boxShadow: '4px 0 10px rgba(0,0,0,0.1)', zIndex: 10 }}>
-      <div style={{ padding: '20px', borderBottom: '1px solid #334155', textAlign: 'center' }}>
-        <h2 style={{ margin: 0, color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-          ⚙️ Zita Admin
-        </h2>
+    <aside style={{ width: '260px', backgroundColor: 'var(--ops-dark-surface)', color: 'white', display: 'flex', flexDirection: 'column', boxShadow: '4px 0 10px rgba(0,0,0,0.1)', zIndex: 10 }}>
+      <div style={{ padding: '22px 20px', borderBottom: '1px solid var(--ops-dark-border)' }}>
+        <div className="ops-brand">
+          <img src="/logo.png" alt="Doña Zita" />
+          <div className="ops-brand-text" style={{ color: '#f3f1ec' }}>
+            <strong style={{ fontSize: '1.05rem' }}>Doña Zita</strong>
+            <small style={{ color: 'var(--ops-dark-text-soft)' }}>Panel Administrativo</small>
+          </div>
+        </div>
       </div>
-      
+
       <nav style={{ display: 'flex', flexDirection: 'column', padding: '20px 0' }}>
         {[
-          { id: 'reportes', icono: '📊', texto: 'Reportes & IA' },
-          { id: 'platos', icono: '🍔', texto: 'Menú & Recetas' },
-          { id: 'fotos', icono: '📸', texto: 'Fotos del Menú' }, // 👈 NUEVA PESTAÑA AQUÍ
-          { id: 'ingredientes', icono: '📦', texto: 'Inventario' },
-          { id: 'empleados', icono: '👥', texto: 'Gestión de Personal' },
-          { id: 'configuracion', icono: '🎛️', texto: 'Configuración' }
-        ].map(item => (
-          <button 
-            key={item.id} 
-            onClick={() => setTabActiva(item.id)}
-            style={{ 
-              padding: '15px 25px', textAlign: 'left', fontSize: '15px', border: 'none', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'center', transition: '0.2s',
-              backgroundColor: tabActiva === item.id ? '#334155' : 'transparent',
-              color: tabActiva === item.id ? '#10b981' : '#cbd5e1',
-              borderLeft: tabActiva === item.id ? '4px solid #10b981' : '4px solid transparent',
-              fontWeight: tabActiva === item.id ? 'bold' : 'normal'
-            }}
-          >
-            <span style={{ fontSize: '18px' }}>{item.icono}</span> {item.texto}
-          </button>
-        ))}
+          { id: 'reportes', texto: 'Reportes & IA' },
+          { id: 'platos', texto: 'Menú & Recetas' },
+          { id: 'fotos', texto: 'Fotos del Menú' },
+          { id: 'ingredientes', texto: 'Inventario' },
+          { id: 'empleados', texto: 'Gestión de Personal' },
+          { id: 'configuracion', texto: 'Configuración' }
+        ].map(item => {
+          const Icono = iconosTab[item.id];
+          return (
+            <button
+              key={item.id}
+              onClick={() => setTabActiva(item.id)}
+              style={{
+                padding: '14px 25px', textAlign: 'left', fontSize: '14.5px', border: 'none', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'center',
+                transition: 'background-color 160ms ease, color 160ms ease',
+                backgroundColor: tabActiva === item.id ? 'var(--ops-dark-surface-alt)' : 'transparent',
+                color: tabActiva === item.id ? 'var(--ops-accent)' : '#cfd1d8',
+                borderLeft: tabActiva === item.id ? '3px solid var(--ops-accent)' : '3px solid transparent',
+                fontWeight: tabActiva === item.id ? 600 : 500
+              }}
+            >
+              <Icono size={17} /> {item.texto}
+            </button>
+          );
+        })}
       </nav>
     </aside>
 
     {/* ================= CONTENIDO PRINCIPAL ================= */}
-    <main style={{ flex: 1, padding: '40px', overflowY: 'auto', backgroundColor: '#f1f5f9' }}>
-      
+    <main style={{ flex: 1, padding: '40px', overflowY: 'auto', backgroundColor: 'var(--ops-surface-alt)' }}>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: '#0f172a', margin: 0, textTransform: 'capitalize' }}>
+        <h1 style={{ fontFamily: 'var(--ops-font-display)', color: 'var(--ops-ink)', margin: 0 }}>
           {tabActiva === 'reportes' ? 'Análisis de Datos' : tabActiva === 'platos' ? 'Gestión de Menú' : tabActiva === 'fotos' ? 'Fotografías del Menú' : tabActiva === 'ingredientes' ? 'Control de Stock' : tabActiva === 'empleados' ? 'Gestión de Personal' : 'Configuración'}
         </h1>
-        {mensaje && <div style={{ backgroundColor: '#10b981', color: 'white', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', animation: 'fadeIn 0.5s' }}>{mensaje}</div>}
+        {mensaje && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: 'var(--ops-success-soft)', color: 'var(--ops-success)', padding: '9px 18px', borderRadius: 'var(--ops-radius-sm)', fontWeight: 600, fontSize: '0.88rem' }}>
+            <Check size={15} /> {mensaje}
+          </div>
+        )}
       </div>
 
       {/* --- INYECTAMOS LOS MÓDULOS AQUÍ --- */}
@@ -257,15 +279,15 @@ export default function AdminDashboard() {
       {tabActiva === 'platos' && (
         <div style={theme.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 style={{ margin: 0, color: '#334155' }}>Gestión de Platos</h2>
+            <h2 style={{ margin: 0, fontFamily: 'var(--ops-font-display)', color: 'var(--ops-ink)' }}>Gestión de Platos</h2>
             
             {/* PESTAÑITA ELEGANTE DE CREACIÓN */}
             {!mostrarFormPlato ? (
               <button style={theme.btnPrimary} onClick={() => setMostrarFormPlato(true)}>+ Nuevo Plato</button>
             ) : (
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', animation: 'fadeIn 0.3s' }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: 'var(--ops-surface-alt)', padding: '10px', borderRadius: 'var(--ops-radius-sm)', border: '1px solid var(--ops-border)' }}>
                 <input 
-                  style={{...theme.input, width: '250px', border: '1px solid #cbd5e1'}} 
+                  style={{...theme.input, width: '250px', border: '1px solid var(--ops-border)'}} 
                   placeholder="Ej: Churrasco Especial" 
                   autoFocus
                   value={nuevoPlatoNombre}
@@ -283,20 +305,20 @@ export default function AdminDashboard() {
             <tbody>
               {platos.map(plato => (
                 <tr key={plato.id_plato}>
-                  <td style={theme.td}><input style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={plato.nombre} onBlur={e => guardarPlato({...plato, nombre: e.target.value})} onFocus={e => e.target.style.border = '1px solid #cbd5e1'} /></td>
+                  <td style={theme.td}><input style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={plato.nombre} onBlur={e => guardarPlato({...plato, nombre: e.target.value})} onFocus={e => e.target.style.border = '1px solid var(--ops-border)'} /></td>
                   <td style={theme.td}>{plato.categoria_nombre}</td>
-                  <td style={theme.td}><input type="number" style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={plato.precio_base} onBlur={e => guardarPlato({...plato, precio_base: parseFloat(e.target.value)})} onFocus={e => e.target.style.border = '1px solid #cbd5e1'} /></td>
-                  <td style={theme.td}><input type="number" style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={plato.tiempo_prep_min} onBlur={e => guardarPlato({...plato, tiempo_prep_min: parseInt(e.target.value)})} onFocus={e => e.target.style.border = '1px solid #cbd5e1'} /></td>
+                  <td style={theme.td}><input type="number" style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={plato.precio_base} onBlur={e => guardarPlato({...plato, precio_base: parseFloat(e.target.value)})} onFocus={e => e.target.style.border = '1px solid var(--ops-border)'} /></td>
+                  <td style={theme.td}><input type="number" style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={plato.tiempo_prep_min} onBlur={e => guardarPlato({...plato, tiempo_prep_min: parseInt(e.target.value)})} onFocus={e => e.target.style.border = '1px solid var(--ops-border)'} /></td>
                   <td style={theme.td}>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button style={{...theme.btnSecondary, backgroundColor: '#fef08a', borderColor: '#fde047', color: '#854d0e'}} onClick={() => abrirReceta(plato)}>
-                        🍳 Receta
+                      <button style={{...theme.btnSecondary, backgroundColor: 'var(--ops-warning-soft)', borderColor: 'transparent', color: 'var(--ops-warning)'}} onClick={() => abrirReceta(plato)}>
+                        <ChefHat size={14} /> Receta
                       </button>
-                      <button style={{...theme.btnSecondary, backgroundColor: '#dbeafe', borderColor: '#bfdbfe', color: '#1d4ed8'}} onClick={() => abrirEdicionPlato(plato)} title="Editar plato">
-                        ✏️ Editar
+                      <button style={{...theme.btnSecondary, backgroundColor: 'var(--ops-accent-soft)', borderColor: 'transparent', color: 'var(--ops-accent-dark)'}} onClick={() => abrirEdicionPlato(plato)} title="Editar plato">
+                        <Pencil size={14} /> Editar
                       </button>
-                      <button style={{...theme.btnSecondary, backgroundColor: '#fee2e2', borderColor: '#fecaca', color: '#b91c1c'}} onClick={() => eliminarPlato(plato)} title="Eliminar plato">
-                        🗑️ Eliminar
+                      <button style={{...theme.btnSecondary, backgroundColor: 'var(--ops-danger-soft)', borderColor: 'transparent', color: 'var(--ops-danger)'}} onClick={() => eliminarPlato(plato)} title="Eliminar plato">
+                        <Trash2 size={14} /> Eliminar
                       </button>
                     </div>
                   </td>
@@ -310,26 +332,26 @@ export default function AdminDashboard() {
       {/* ================= PESTAÑA NUEVA: FOTOS DEL MENÚ ================= */}
       {tabActiva === 'fotos' && (
         <div style={{ ...theme.card }}>
-          <h2 style={{ margin: '0 0 20px 0', color: '#334155' }}>Fotografías para el Kiosko</h2>
+          <h2 style={{ margin: '0 0 20px 0', fontFamily: 'var(--ops-font-display)', color: 'var(--ops-ink)' }}>Fotografías para el Kiosko</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
             {platosGestion.map(plato => (
-              <div key={plato.id_plato} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '15px', textAlign: 'center', backgroundColor: '#f8fafc' }}>
-               <img 
-  src={`http://127.0.0.1:8000${plato.ruta_imagen}`} 
+              <div key={plato.id_plato} style={{ border: '1px solid var(--ops-border)', borderRadius: 'var(--ops-radius-sm)', padding: '15px', textAlign: 'center', backgroundColor: 'var(--ops-surface-alt)' }}>
+               <img
+  src={`http://127.0.0.1:8000${plato.ruta_imagen}`}
   alt={plato.nombre}
   onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/250x150?text=Sin+Foto'; }}
-  style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '6px', marginBottom: '10px' }}
+  style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: 'var(--ops-radius-sm)', marginBottom: '10px' }}
 />
-                <h4 style={{ margin: '0 0 5px 0', color: '#1e293b' }}>{plato.nombre}</h4>
-                <span style={{ color: '#10b981', fontWeight: 'bold', display: 'block', marginBottom: '15px' }}>${parseFloat(plato.precio_base).toFixed(2)}</span>
-                
-                <label style={{ cursor: 'pointer', backgroundColor: '#3b82f6', color: 'white', padding: '8px 15px', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', display: 'inline-block' }}>
-                  📸 Subir Nueva Foto
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    style={{ display: 'none' }} 
-                    onChange={(e) => subirImagen(plato.id_plato, e)} 
+                <h4 style={{ margin: '0 0 5px 0', color: 'var(--ops-ink)' }}>{plato.nombre}</h4>
+                <span style={{ color: 'var(--ops-success)', fontWeight: 'bold', display: 'block', marginBottom: '15px' }}>${parseFloat(plato.precio_base).toFixed(2)}</span>
+
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', backgroundColor: 'var(--ops-accent)', color: 'var(--ops-accent-contrast)', padding: '8px 15px', borderRadius: 'var(--ops-radius-sm)', fontSize: '14px', fontWeight: 600 }}>
+                  <Camera size={15} /> Subir nueva foto
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => subirImagen(plato.id_plato, e)}
                   />
                 </label>
               </div>
@@ -342,16 +364,16 @@ export default function AdminDashboard() {
       {tabActiva === 'ingredientes' && (
         <div style={theme.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 style={{ margin: 0, color: '#334155' }}>Control de Stock</h2>
-            
+            <h2 style={{ margin: 0, fontFamily: 'var(--ops-font-display)', color: 'var(--ops-ink)' }}>Control de Stock</h2>
+
             {/* PESTAÑITA ELEGANTE DE CREACIÓN */}
             {!mostrarFormIngrediente ? (
               <button style={theme.btnPrimary} onClick={() => setMostrarFormIngrediente(true)}>+ Nuevo Ingrediente</button>
             ) : (
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', animation: 'fadeIn 0.3s' }}>
-                <input 
-                  style={{...theme.input, width: '250px', border: '1px solid #cbd5e1'}} 
-                  placeholder="Ej: Aguacate (u)" 
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: 'var(--ops-surface-alt)', padding: '10px', borderRadius: 'var(--ops-radius-sm)', border: '1px solid var(--ops-border)' }}>
+                <input
+                  style={{...theme.input, width: '250px', border: '1px solid var(--ops-border)'}}
+                  placeholder="Ej: Aguacate (u)"
                   autoFocus
                   value={nuevoIngNombre}
                   onChange={e => setNuevoIngNombre(e.target.value)}
@@ -368,17 +390,17 @@ export default function AdminDashboard() {
             <tbody>
               {ingredientes.map(ing => (
                 <tr key={ing.id_ingrediente}>
-                  <td style={theme.td}><input style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={ing.nombre} onBlur={e => guardarIngrediente({...ing, nombre: e.target.value})} onFocus={e => e.target.style.border = '1px solid #cbd5e1'} /></td>
+                  <td style={theme.td}><input style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={ing.nombre} onBlur={e => guardarIngrediente({...ing, nombre: e.target.value})} onFocus={e => e.target.style.border = '1px solid var(--ops-border)'} /></td>
                   
                   <td style={theme.td}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                      <span style={{ fontWeight: 'bold', fontSize: '18px', color: ing.stock_actual < 5 ? '#ef4444' : '#10b981', minWidth: '40px' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '18px', color: ing.stock_actual < 5 ? 'var(--ops-danger)' : 'var(--ops-success)', minWidth: '40px' }}>
                         {ing.stock_actual}
                       </span>
                       <div style={{ display: 'flex', gap: '5px' }}>
-                        <input 
+                        <input
                           type="number" step="0.5" id={`stockInput-${ing.id_ingrediente}`}
-                          style={{...theme.input, width: '70px', padding: '8px'}} placeholder="+ / -" 
+                          style={{...theme.input, width: '70px', padding: '8px'}} placeholder="+ / -"
                         />
                         <button style={{...theme.btnSecondary, padding: '8px 12px'}} onClick={() => {
                             const input = document.getElementById(`stockInput-${ing.id_ingrediente}`);
@@ -388,12 +410,12 @@ export default function AdminDashboard() {
                               if (nuevoStock < 0) alert("El stock no puede ser negativo.");
                               else { guardarIngrediente({...ing, stock_actual: nuevoStock}); input.value = ''; }
                             }
-                          }}>✔</button>
+                          }}><Check size={14} /></button>
                       </div>
                     </div>
                   </td>
 
-                  <td style={theme.td}><input type="number" step="0.05" style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={ing.precio_extra} onBlur={e => guardarIngrediente({...ing, precio_extra: parseFloat(e.target.value)})} onFocus={e => e.target.style.border = '1px solid #cbd5e1'} /></td>
+                  <td style={theme.td}><input type="number" step="0.05" style={{...theme.input, border: '1px solid transparent', backgroundColor: 'transparent'}} defaultValue={ing.precio_extra} onBlur={e => guardarIngrediente({...ing, precio_extra: parseFloat(e.target.value)})} onFocus={e => e.target.style.border = '1px solid var(--ops-border)'} /></td>
                 </tr>
               ))}
             </tbody>
@@ -404,13 +426,13 @@ export default function AdminDashboard() {
       {/* ================= PESTAÑA: CONFIGURACIÓN ================= */}
       {tabActiva === 'configuracion' && (
         <div style={{...theme.card, maxWidth: '600px', margin: '0 auto'}}>
-          <h2 style={{ margin: '0 0 20px 0', color: '#334155' }}>Parámetros Operativos</h2>
+          <h2 style={{ margin: '0 0 20px 0', fontFamily: 'var(--ops-font-display)', color: 'var(--ops-ink)' }}>Parámetros Operativos</h2>
           <form onSubmit={guardarConfiguracion} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <label>Máximo Platos Kiosko: <input type="number" style={theme.input} value={config.max_platos_kiosko} onChange={e => setConfig({...config, max_platos_kiosko: parseInt(e.target.value)})} /></label>
-            <label>Capacidad Paila (Cocina): <input type="number" style={theme.input} value={config.capacidad_paila_cocina} onChange={e => setConfig({...config, capacidad_paila_cocina: parseInt(e.target.value)})} /></label>
-            <label>Cocineros Activos: <input type="number" style={theme.input} value={config.cantidad_cocineros} onChange={e => setConfig({...config, cantidad_cocineros: parseInt(e.target.value)})} /></label>
-            <label>Margen Tiempo IA (ej 0.10): <input type="number" step="0.01" style={theme.input} value={config.porcentaje_tiempo_extra} onChange={e => setConfig({...config, porcentaje_tiempo_extra: parseFloat(e.target.value)})} /></label>
-            <button type="submit" style={{...theme.btnPrimary, marginTop: '10px', padding: '12px'}}>Guardar Configuración</button>
+            <label className="ops-label">Máximo platos Kiosko <input type="number" style={{...theme.input, marginTop: 4}} value={config.max_platos_kiosko} onChange={e => setConfig({...config, max_platos_kiosko: parseInt(e.target.value)})} /></label>
+            <label className="ops-label">Capacidad paila (cocina) <input type="number" style={{...theme.input, marginTop: 4}} value={config.capacidad_paila_cocina} onChange={e => setConfig({...config, capacidad_paila_cocina: parseInt(e.target.value)})} /></label>
+            <label className="ops-label">Cocineros activos <input type="number" style={{...theme.input, marginTop: 4}} value={config.cantidad_cocineros} onChange={e => setConfig({...config, cantidad_cocineros: parseInt(e.target.value)})} /></label>
+            <label className="ops-label">Margen tiempo IA (ej. 0.10) <input type="number" step="0.01" style={{...theme.input, marginTop: 4}} value={config.porcentaje_tiempo_extra} onChange={e => setConfig({...config, porcentaje_tiempo_extra: parseFloat(e.target.value)})} /></label>
+            <button type="submit" style={{...theme.btnPrimary, marginTop: '10px', padding: '12px', justifyContent: 'center'}}>Guardar configuración</button>
           </form>
         </div>
       )}
@@ -419,13 +441,13 @@ export default function AdminDashboard() {
 
     {/* ================= MODAL DE RECETAS ================= */}
     {modalReceta.visible && (
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' }}>
-        <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '500px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Receta: {modalReceta.plato.nombre}</h2>
-          
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15,16,19,0.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' }}>
+        <div style={{ backgroundColor: 'var(--ops-surface)', padding: '30px', borderRadius: 'var(--ops-radius)', width: '500px', maxWidth: '90%', boxShadow: 'var(--ops-shadow)' }}>
+          <h2 style={{ marginTop: 0, fontFamily: 'var(--ops-font-display)', color: 'var(--ops-ink)' }}>Receta: {modalReceta.plato.nombre}</h2>
+
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', padding: '15px', backgroundColor: 'var(--ops-surface-alt)', borderRadius: 'var(--ops-radius-sm)' }}>
             <select style={theme.input} value={nuevoIngReceta.id_ingrediente} onChange={e => setNuevoIngReceta({...nuevoIngReceta, id_ingrediente: e.target.value})}>
-              <option value="">Selecciona Ingrediente...</option>
+              <option value="">Selecciona ingrediente...</option>
               {ingredientes.map(ing => <option key={ing.id_ingrediente} value={ing.id_ingrediente}>{ing.nombre}</option>)}
             </select>
             <input type="number" step="0.1" style={{...theme.input, width: '90px'}} placeholder="Cant." value={nuevoIngReceta.cantidad_base} onChange={e => setNuevoIngReceta({...nuevoIngReceta, cantidad_base: e.target.value})} />
@@ -433,15 +455,15 @@ export default function AdminDashboard() {
           </div>
 
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {modalReceta.ingredientesReceta.length === 0 ? <p style={{ color: '#94a3b8', textAlign: 'center' }}>No hay ingredientes asignados.</p> : null}
+            {modalReceta.ingredientesReceta.length === 0 ? <p style={{ color: 'var(--ops-ink-soft)', textAlign: 'center' }}>No hay ingredientes asignados.</p> : null}
             {modalReceta.ingredientesReceta.map(item => (
-              <li key={item.id_ingrediente} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: '1px solid #e2e8f0', alignItems: 'center' }}>
-                <span style={{ fontWeight: 'bold', color: '#334155' }}>{item.ingrediente_nombre}</span>
+              <li key={item.id_ingrediente} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: '1px solid var(--ops-border)', alignItems: 'center' }}>
+                <span style={{ fontWeight: 'bold', color: 'var(--ops-ink)' }}>{item.ingrediente_nombre}</span>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <span style={{ color: '#64748b', fontSize: '14px' }}>Cant:</span>
-                  <input 
-                    type="number" step="0.1" style={{...theme.input, width: '70px', padding: '5px', textAlign: 'center'}} 
-                    defaultValue={item.cantidad_base} 
+                  <span style={{ color: 'var(--ops-ink-soft)', fontSize: '14px' }}>Cant:</span>
+                  <input
+                    type="number" step="0.1" style={{...theme.input, width: '70px', padding: '5px', textAlign: 'center'}}
+                    defaultValue={item.cantidad_base}
                     onBlur={async (e) => {
                       const nuevaCant = parseFloat(e.target.value);
                       if(nuevaCant !== item.cantidad_base && !isNaN(nuevaCant)) {
@@ -449,16 +471,18 @@ export default function AdminDashboard() {
                         await apiFetch('/admin/receta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                         abrirReceta(modalReceta.plato);
                       }
-                    }} 
+                    }}
                   />
-                  <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold', fontSize: '18px', marginLeft: '5px' }} onClick={() => quitarDeReceta(item.id_ingrediente)}>✖</button>
+                  <button style={{ display: 'inline-flex', border: 'none', background: 'transparent', color: 'var(--ops-danger)', cursor: 'pointer', marginLeft: '5px' }} onClick={() => quitarDeReceta(item.id_ingrediente)}>
+                    <X size={16} />
+                  </button>
                 </div>
               </li>
             ))}
           </ul>
 
-          <button style={{...theme.btnSecondary, width: '100%', marginTop: '20px', padding: '12px'}} onClick={() => setModalReceta({ visible: false, plato: null, ingredientesReceta: [] })}>
-            Cerrar Ventana
+          <button style={{...theme.btnSecondary, width: '100%', marginTop: '20px', padding: '12px', justifyContent: 'center'}} onClick={() => setModalReceta({ visible: false, plato: null, ingredientesReceta: [] })}>
+            Cerrar ventana
           </button>
         </div>
       </div>
@@ -466,12 +490,12 @@ export default function AdminDashboard() {
 
     {/* ================= MODAL DE EDICIÓN DE PLATO ================= */}
     {platoEditando && (
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' }}>
-        <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '420px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Editar Plato</h2>
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15,16,19,0.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' }}>
+        <div style={{ backgroundColor: 'var(--ops-surface)', padding: '30px', borderRadius: 'var(--ops-radius)', width: '420px', maxWidth: '90%', boxShadow: 'var(--ops-shadow)' }}>
+          <h2 style={{ marginTop: 0, fontFamily: 'var(--ops-font-display)', color: 'var(--ops-ink)' }}>Editar plato</h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold' }}>
+            <label style={{ fontSize: '14px', color: 'var(--ops-ink-soft)', fontWeight: 600 }}>
               Nombre
               <input
                 style={{ ...theme.input, marginTop: '4px' }}
@@ -480,7 +504,7 @@ export default function AdminDashboard() {
               />
             </label>
 
-            <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold' }}>
+            <label style={{ fontSize: '14px', color: 'var(--ops-ink-soft)', fontWeight: 600 }}>
               Categoría
               <select
                 style={{ ...theme.input, marginTop: '4px' }}
@@ -494,7 +518,7 @@ export default function AdminDashboard() {
             </label>
 
             <div style={{ display: 'flex', gap: '14px' }}>
-              <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold', flex: 1 }}>
+              <label style={{ fontSize: '14px', color: 'var(--ops-ink-soft)', fontWeight: 600, flex: 1 }}>
                 Precio ($)
                 <input
                   type="number" step="0.01"
@@ -503,7 +527,7 @@ export default function AdminDashboard() {
                   onChange={e => setPlatoEditando({ ...platoEditando, precio_base: e.target.value })}
                 />
               </label>
-              <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold', flex: 1 }}>
+              <label style={{ fontSize: '14px', color: 'var(--ops-ink-soft)', fontWeight: 600, flex: 1 }}>
                 Tiempo (min)
                 <input
                   type="number"
@@ -514,7 +538,7 @@ export default function AdminDashboard() {
               </label>
             </div>
 
-            <label style={{ fontSize: '14px', color: '#475569', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ fontSize: '14px', color: 'var(--ops-ink-soft)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="checkbox"
                 checked={!!platoEditando.requiere_coccion}
@@ -525,10 +549,10 @@ export default function AdminDashboard() {
           </div>
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-            <button style={{...theme.btnPrimary, flex: 1, padding: '12px'}} onClick={guardarEdicionPlato}>
-              Guardar Cambios
+            <button style={{...theme.btnPrimary, flex: 1, padding: '12px', justifyContent: 'center'}} onClick={guardarEdicionPlato}>
+              Guardar cambios
             </button>
-            <button style={{...theme.btnSecondary, flex: 1, padding: '12px'}} onClick={() => setPlatoEditando(null)}>
+            <button style={{...theme.btnSecondary, flex: 1, padding: '12px', justifyContent: 'center'}} onClick={() => setPlatoEditando(null)}>
               Cancelar
             </button>
           </div>

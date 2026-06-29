@@ -1,5 +1,6 @@
 // src/App.jsx
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { ChefHat, CreditCard, LayoutDashboard, LogOut, MonitorPlay, Smartphone } from 'lucide-react';
 
 // 📦 Importación de Pantallas
 import Kiosko from './Kiosko';
@@ -11,66 +12,98 @@ import Login from './Login';
 import AccesoDenegado from './AccesoDenegado';
 import RutaProtegida from './RutaProtegida';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import './OpsTheme.css';
 
-// 🔒 Si hay sesión de empleado/admin, muestra quién es y un botón de salir;
-// si no, un enlace a /login. El Kiosko y la Pantalla de Turnos son públicos
-// y no dependen de esto.
-function SesionBarra() {
-  const { usuario, logout } = useAuth();
-  const linkStyle = { color: '#f8fafc', textDecoration: 'none', fontWeight: 'bold', fontSize: '0.95rem' };
+// Rutas de cara al cliente: conservan exactamente la barra técnica original
+// (el "simulador de múltiples terminales" de la tesis). Todo lo demás es
+// personal interno y usa la barra elegante de Operaciones.
+const RUTAS_CLIENTE = ['/', '/turnos'];
 
-  if (!usuario) {
-    return <Link to="/login" style={linkStyle}>🔒 Iniciar sesión</Link>;
-  }
+function BarraTecnicaOriginal() {
+  const linkStyle = { color: '#f8fafc', textDecoration: 'none', fontWeight: 'bold', fontSize: '1rem' };
+  const adminStyle = { ...linkStyle, color: '#10b981' };
 
   return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 12, color: '#f8fafc' }}>
-      <span style={{ fontSize: '0.9rem' }}>👤 {usuario.username} ({usuario.rol})</span>
-      <button
-        onClick={logout}
-        style={{ background: '#7d1620', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 'bold', cursor: 'pointer' }}
-      >
-        Salir
-      </button>
-    </span>
+    <nav style={{
+      background: '#1e293b', padding: '15px', display: 'flex', gap: '25px',
+      justifyContent: 'center', alignItems: 'center', borderBottom: '3px solid #334155', flexWrap: 'wrap'
+    }}>
+      <Link to="/" style={linkStyle}>📱 Vista Kiosko</Link>
+      <Link to="/cocina" style={linkStyle}>👨‍🍳 Monitor Cocina</Link>
+      <Link to="/turnos" style={linkStyle}>📺 Pantalla Turnos</Link>
+      <Link to="/caja" style={adminStyle}>💵 Caja / Cobros</Link>
+      <Link to="/AdminDashboard" style={adminStyle}>⚙️ Administración</Link>
+    </nav>
   );
 }
 
+// 🔒 Barra superior de Operaciones: identidad de marca + navegación entre
+// estaciones + sesión activa. Reemplaza la barra técnica solo fuera del
+// Kiosko/Turnos.
+function BarraOperaciones() {
+  const { usuario, logout } = useAuth();
+  const location = useLocation();
+
+  const enlaceEstilo = (ruta) => ({
+    display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none',
+    fontSize: '0.85rem', fontWeight: 600, padding: '8px 14px', borderRadius: 9,
+    color: location.pathname.toLowerCase() === ruta.toLowerCase() ? 'var(--ops-accent-contrast)' : '#cfd1d8',
+    backgroundColor: location.pathname.toLowerCase() === ruta.toLowerCase() ? 'var(--ops-accent)' : 'transparent',
+    transition: 'background-color 160ms ease, color 160ms ease',
+  });
+
+  return (
+    <nav style={{
+      background: '#15171c', padding: '14px 28px', display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, borderBottom: '1px solid #2a2c34',
+    }}>
+      <div className="ops-brand">
+        <img src="/logo.png" alt="Doña Zita" />
+        <div className="ops-brand-text" style={{ color: '#f3f1ec' }}>
+          <strong style={{ fontSize: '1.05rem' }}>Doña Zita</strong>
+          <small style={{ color: '#9a9ca5' }}>Operaciones</small>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <Link to="/" style={enlaceEstilo('__kiosko__')}><Smartphone size={15} /> Kiosko</Link>
+        <Link to="/cocina" style={enlaceEstilo('/cocina')}><ChefHat size={15} /> Cocina</Link>
+        <Link to="/turnos" style={enlaceEstilo('__turnos__')}><MonitorPlay size={15} /> Turnos</Link>
+        <Link to="/caja" style={enlaceEstilo('/caja')}><CreditCard size={15} /> Caja</Link>
+        <Link to="/AdminDashboard" style={enlaceEstilo('/AdminDashboard')}><LayoutDashboard size={15} /> Administración</Link>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {usuario ? (
+          <>
+            <span style={{ fontSize: '0.82rem', color: '#9a9ca5' }}>
+              {usuario.username} <span style={{ opacity: 0.7 }}>· {usuario.rol}</span>
+            </span>
+            <button onClick={logout} className="ops-btn ops-btn--ghost" style={{ color: '#cfd1d8', borderColor: '#3a3d48', padding: '7px 14px' }}>
+              <LogOut size={14} /> Salir
+            </button>
+          </>
+        ) : (
+          <Link to="/login" className="ops-btn ops-btn--primary" style={{ textDecoration: 'none', padding: '7px 16px' }}>
+            Iniciar sesión
+          </Link>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+function BarraNavegacion() {
+  const location = useLocation();
+  const esRutaCliente = RUTAS_CLIENTE.includes(location.pathname);
+  return esRutaCliente ? <BarraTecnicaOriginal /> : <BarraOperaciones />;
+}
+
 function App() {
-  // 🎨 Estilos reutilizables para los botones del menú superior
-  const linkStyle = {
-    color: '#f8fafc', // Blanco hueso
-    textDecoration: 'none',
-    fontWeight: 'bold',
-    fontSize: '1rem',
-  };
-
-  const adminStyle = {
-    ...linkStyle,
-    color: '#10b981', // Verde esmeralda para módulos administrativos
-  };
-
   return (
     <Router>
       <AuthProvider>
-        {/* Barra de navegación técnica (Simulador de múltiples terminales) */}
-        <nav style={{
-          background: '#1e293b',
-          padding: '15px',
-          display: 'flex',
-          gap: '25px',
-          justifyContent: 'center',
-          alignItems: 'center',
-          borderBottom: '3px solid #334155',
-          flexWrap: 'wrap'
-        }}>
-          <Link to="/" style={linkStyle}>📱 Vista Kiosko</Link>
-          <Link to="/cocina" style={linkStyle}>👨‍🍳 Monitor Cocina</Link>
-          <Link to="/turnos" style={linkStyle}>📺 Pantalla Turnos</Link>
-          <Link to="/caja" style={adminStyle}>💵 Caja / Cobros</Link>
-          <Link to="/AdminDashboard" style={adminStyle}>⚙️ Administración</Link>
-          <SesionBarra />
-        </nav>
+        <BarraNavegacion />
 
         {/* Enrutador de Componentes */}
         <Routes>

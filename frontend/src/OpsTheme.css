@@ -1,0 +1,182 @@
+/* =====================================================================
+   SISTEMA DE DISEÑO "DOÑA ZITA · OPERACIONES"
+   Capa visual exclusiva para las pantallas de personal (Login, Caja,
+   Monitor de Cocina, Panel de Administración, Gestión de Personal).
+   NO se usa en el Kiosko, la Pantalla de Turnos ni en la pantalla de
+   selección de modalidad — esas mantienen su propia identidad cálida
+   orientada al cliente.
+
+   Filosofía: tipografía editorial (Playfair Display) para títulos +
+   sans profesional (Inter) para todo lo operativo; un único acento
+   "bronce" en vez del rojo/ámbar del kiosko, para que el personal
+   distinga de inmediato "estoy en una herramienta de trabajo, no en
+   la pantalla del cliente". Cocina usa modo oscuro (reduce el reflejo
+   bajo las luces de cocina); Caja/Admin/Login usan modo claro (mejor
+   legibilidad para formularios y tablas).
+   ===================================================================== */
+
+:root {
+  /* Tipografía */
+  --ops-font-display: 'Playfair Display', Georgia, serif;
+  --ops-font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Acento de marca (bronce/oro envejecido — distinto del rojo del kiosko) */
+  --ops-accent: #9c7a3c;
+  --ops-accent-dark: #7c5f2c;
+  --ops-accent-soft: #f1e6cf;
+  --ops-accent-contrast: #fffaf0;
+
+  /* Neutrales modo claro (Caja / Admin / Login) */
+  --ops-ink: #1c1d21;
+  --ops-ink-soft: #6b6d76;
+  --ops-surface: #ffffff;
+  --ops-surface-alt: #f6f5f3;
+  --ops-border: #e6e4df;
+
+  /* Neutrales modo oscuro (Monitor de Cocina) */
+  --ops-dark-bg: #15171c;
+  --ops-dark-surface: #1d1f26;
+  --ops-dark-surface-alt: #242730;
+  --ops-dark-border: #323540;
+  --ops-dark-text: #ece9e2;
+  --ops-dark-text-soft: #9a9ca5;
+
+  /* Semánticos */
+  --ops-danger: #a13d34;
+  --ops-danger-soft: #f6e4e1;
+  --ops-success: #3c6e52;
+  --ops-success-soft: #e2ece6;
+  --ops-warning: #a3742c;
+  --ops-warning-soft: #f3e6cf;
+
+  --ops-radius: 14px;
+  --ops-radius-sm: 9px;
+  --ops-shadow: 0 14px 34px -18px rgba(28, 29, 33, 0.35);
+  --ops-shadow-sm: 0 6px 16px -10px rgba(28, 29, 33, 0.3);
+  --ops-ease: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ----------------------------------------------------------------- */
+/* Marca: logo + wordmark, reutilizado en cada cabecera               */
+/* ----------------------------------------------------------------- */
+.ops-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ops-brand img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--ops-accent-contrast);
+  border: 1.5px solid var(--ops-border);
+  flex-shrink: 0;
+}
+
+.ops-brand-text h1,
+.ops-brand-text strong {
+  font-family: var(--ops-font-display);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.ops-brand-text small {
+  display: block;
+  font-family: var(--ops-font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+/* ----------------------------------------------------------------- */
+/* Botones                                                            */
+/* ----------------------------------------------------------------- */
+.ops-btn {
+  font-family: var(--ops-font-body);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 10px 18px;
+  border-radius: var(--ops-radius-sm);
+  transition: transform 160ms var(--ops-ease), filter 160ms ease, opacity 160ms ease, background-color 160ms ease;
+  transform: translateZ(0);
+}
+.ops-btn:active { transform: scale(0.96); }
+.ops-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) {
+  .ops-btn:hover:not(:disabled) { filter: brightness(1.06); }
+}
+
+.ops-btn--primary { background: var(--ops-accent); color: var(--ops-accent-contrast); }
+.ops-btn--ghost { background: transparent; color: var(--ops-ink-soft); border: 1px solid var(--ops-border); }
+.ops-btn--danger { background: var(--ops-danger-soft); color: var(--ops-danger); }
+.ops-btn--success { background: var(--ops-success-soft); color: var(--ops-success); }
+.ops-btn--muted { background: var(--ops-surface-alt); color: var(--ops-ink-soft); }
+
+/* ----------------------------------------------------------------- */
+/* Tarjetas, badges, inputs (modo claro)                              */
+/* ----------------------------------------------------------------- */
+.ops-card {
+  background: var(--ops-surface);
+  border: 1px solid var(--ops-border);
+  border-radius: var(--ops-radius);
+  box-shadow: var(--ops-shadow-sm);
+}
+
+.ops-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+
+.ops-input {
+  font-family: var(--ops-font-body);
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--ops-border);
+  border-radius: var(--ops-radius-sm);
+  background: var(--ops-surface);
+  color: var(--ops-ink);
+  font-size: 0.92rem;
+  box-sizing: border-box;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.ops-input:focus {
+  outline: none;
+  border-color: var(--ops-accent);
+  box-shadow: 0 0 0 3px var(--ops-accent-soft);
+}
+
+.ops-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ops-ink-soft);
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+}
+
+/* Página base modo claro */
+.ops-page {
+  font-family: var(--ops-font-body);
+  background: var(--ops-surface-alt);
+  min-height: 100vh;
+  color: var(--ops-ink);
+}

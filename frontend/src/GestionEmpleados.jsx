@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Lock, Pencil, Unlock, UserPlus } from 'lucide-react';
 import { apiFetch } from './utils/apiFetch';
+import './OpsTheme.css';
 
 const ROLES = [
   { valor: 'empleado', texto: 'Empleado' },
@@ -7,8 +9,8 @@ const ROLES = [
 ];
 
 const BADGE_ROL = {
-  administrador: 'bg-red-100 text-red-800',
-  empleado: 'bg-blue-100 text-blue-800',
+  administrador: 'bg-[var(--ops-accent-soft)] text-[var(--ops-accent-dark)]',
+  empleado: 'bg-stone-100 text-stone-600',
 };
 
 const TEXTO_ROL = {
@@ -103,7 +105,7 @@ function GestionEmpleados() {
       }
 
       if (res.ok) {
-        mostrarMensaje(usuarioEditando ? '✅ Empleado actualizado' : '✅ Empleado creado');
+        mostrarMensaje(usuarioEditando ? 'Empleado actualizado' : 'Empleado creado');
         cerrarModal();
         cargarUsuarios();
       } else {
@@ -128,7 +130,7 @@ function GestionEmpleados() {
         });
 
     if (res.ok || res.status === 204) {
-      mostrarMensaje(usuario.activo ? '🔒 Acceso revocado' : '🔓 Acceso restaurado');
+      mostrarMensaje(usuario.activo ? 'Acceso revocado' : 'Acceso restaurado');
       cargarUsuarios();
     } else {
       const detalle = await res.json().catch(() => null);
@@ -139,30 +141,33 @@ function GestionEmpleados() {
   const kowalski = 'transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-95';
 
   return (
-    <div className="bg-[#fdfbf7] min-h-[60vh] -m-10 p-10 rounded-2xl">
+    <div className="min-h-[60vh]">
       {/* ===================== CABECERA ===================== */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <h1 className="text-3xl font-black text-red-900">Gestión de Personal</h1>
+        <h1 style={{ fontFamily: 'var(--ops-font-display)' }} className="text-3xl font-bold text-stone-800">
+          Gestión de Personal
+        </h1>
         <div className="flex items-center gap-3">
           {mensaje && (
-            <span className="bg-emerald-100 text-emerald-800 font-semibold text-sm px-4 py-2 rounded-full">
+            <span className="text-sm font-semibold px-4 py-2 rounded-full" style={{ background: 'var(--ops-success-soft)', color: 'var(--ops-success)' }}>
               {mensaje}
             </span>
           )}
           <button
             onClick={abrirModalNuevo}
-            className={`bg-red-800 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl shadow-md transform-gpu will-change-transform ${kowalski}`}
+            className={`flex items-center gap-2 text-white font-semibold px-5 py-2.5 rounded-xl shadow-md transform-gpu will-change-transform ${kowalski}`}
+            style={{ background: 'var(--ops-accent)' }}
           >
-            ➕ Nuevo Empleado
+            <UserPlus size={16} /> Nuevo empleado
           </button>
         </div>
       </div>
 
       {/* ===================== TABLA ===================== */}
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+      <div className="ops-card overflow-hidden">
         <table className="w-full text-left">
           <thead>
-            <tr className="bg-stone-50 text-stone-500 text-sm uppercase tracking-wide">
+            <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wide">
               <th className="px-6 py-4 font-semibold">Nombre</th>
               <th className="px-6 py-4 font-semibold">Usuario (login)</th>
               <th className="px-6 py-4 font-semibold">Rol</th>
@@ -193,11 +198,11 @@ function GestionEmpleados() {
                   </td>
                   <td className="px-6 py-4 text-stone-600">{usuario.username}</td>
                   <td className="px-6 py-4">
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${BADGE_ROL[usuario.rol] || 'bg-stone-100 text-stone-600'}`}>
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${BADGE_ROL[usuario.rol] || 'bg-stone-100 text-stone-600'}`}>
                       {TEXTO_ROL[usuario.rol] || usuario.rol}
                     </span>
                     {!usuario.activo && (
-                      <span className="ml-2 inline-block px-3 py-1 rounded-full text-xs font-bold bg-stone-200 text-stone-500">
+                      <span className="ml-2 inline-block px-3 py-1 rounded-full text-xs font-semibold bg-stone-200 text-stone-500">
                         Inactivo
                       </span>
                     )}
@@ -205,19 +210,19 @@ function GestionEmpleados() {
                   <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
                     <button
                       onClick={() => abrirModalEditar(usuario)}
-                      className={`bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold px-3 py-1.5 rounded-lg ${kowalski}`}
+                      className={`inline-flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold px-3 py-1.5 rounded-lg text-sm ${kowalski}`}
                     >
-                      ✏️ Editar
+                      <Pencil size={13} /> Editar
                     </button>
                     <button
                       onClick={() => alternarActivo(usuario)}
-                      className={`font-semibold px-3 py-1.5 rounded-lg ${kowalski} ${
+                      className={`inline-flex items-center gap-1.5 font-semibold px-3 py-1.5 rounded-lg text-sm ${kowalski} ${
                         usuario.activo
-                          ? 'bg-red-100 hover:bg-red-200 text-red-800'
-                          : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                          ? 'bg-[var(--ops-danger-soft)] text-[var(--ops-danger)] hover:opacity-90'
+                          : 'bg-[var(--ops-success-soft)] text-[var(--ops-success)] hover:opacity-90'
                       }`}
                     >
-                      {usuario.activo ? '🔒 Desactivar' : '🔓 Reactivar'}
+                      {usuario.activo ? <><Lock size={13} /> Desactivar</> : <><Unlock size={13} /> Reactivar</>}
                     </button>
                   </td>
                 </tr>
@@ -236,31 +241,31 @@ function GestionEmpleados() {
           <form
             onSubmit={guardarUsuario}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8"
           >
-            <h2 className="text-xl font-black text-red-900 mb-6">
-              {usuarioEditando ? 'Editar Empleado' : 'Nuevo Empleado'}
+            <h2 style={{ fontFamily: 'var(--ops-font-display)' }} className="text-xl font-bold text-stone-800 mb-6">
+              {usuarioEditando ? 'Editar empleado' : 'Nuevo empleado'}
             </h2>
 
-            <label className="block text-sm font-semibold text-stone-600 mb-1">Nombre completo</label>
+            <label className="ops-label">Nombre completo</label>
             <input
               value={form.nombre_completo}
               onChange={(e) => setForm({ ...form, nombre_completo: e.target.value })}
               placeholder="Ej. María Pérez"
-              className="w-full mb-4 px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-red-200"
+              className="ops-input mb-4"
             />
 
-            <label className="block text-sm font-semibold text-stone-600 mb-1">Nombre de usuario</label>
+            <label className="ops-label">Nombre de usuario</label>
             <input
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
               placeholder="ej. mperez"
               disabled={!!usuarioEditando}
               required={!usuarioEditando}
-              className="w-full mb-4 px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:bg-stone-100 disabled:text-stone-400"
+              className="ops-input mb-4 disabled:bg-stone-100 disabled:text-stone-400"
             />
 
-            <label className="block text-sm font-semibold text-stone-600 mb-1">
+            <label className="ops-label">
               Contraseña {usuarioEditando && <span className="text-stone-400 font-normal">(dejar en blanco para no cambiarla)</span>}
             </label>
             <input
@@ -269,34 +274,34 @@ function GestionEmpleados() {
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               placeholder={usuarioEditando ? '••••••••' : 'Mínimo 6 caracteres'}
               required={!usuarioEditando}
-              className="w-full mb-4 px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-red-200"
+              className="ops-input mb-4"
             />
 
-            <label className="block text-sm font-semibold text-stone-600 mb-1">Rol</label>
+            <label className="ops-label">Rol</label>
             <select
               value={form.rol}
               onChange={(e) => setForm({ ...form, rol: e.target.value })}
-              className="w-full mb-6 px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-red-200"
+              className="ops-input mb-6"
             >
               {ROLES.map((r) => (
                 <option key={r.valor} value={r.valor}>{r.texto}</option>
               ))}
             </select>
 
-            {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+            {error && <p style={{ color: 'var(--ops-danger)' }} className="text-sm mb-4">{error}</p>}
 
             <div className="flex justify-end gap-3">
               <button
                 type="button"
                 onClick={cerrarModal}
-                className={`bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold px-5 py-2.5 rounded-xl ${kowalski}`}
+                className={`ops-btn ops-btn--muted ${kowalski}`}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={guardando}
-                className={`bg-red-800 hover:bg-red-700 disabled:bg-stone-400 text-white font-bold px-5 py-2.5 rounded-xl shadow-md ${kowalski}`}
+                className={`ops-btn ops-btn--primary ${kowalski}`}
               >
                 {guardando ? 'Guardando...' : 'Guardar'}
               </button>

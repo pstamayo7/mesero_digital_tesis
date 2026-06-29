@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Lock, User } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
+import './OpsTheme.css';
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -28,32 +30,61 @@ function Login() {
   };
 
   return (
-    <div style={{ maxWidth: 360, margin: '90px auto', padding: 28, fontFamily: 'sans-serif', background: '#fff', borderRadius: 16, boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}>
-      <h2 style={{ marginTop: 0, color: '#7d1620' }}>🔒 Acceso de personal</h2>
-      <form onSubmit={manejarSubmit}>
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Usuario"
-          autoFocus
-          style={{ display: 'block', width: '100%', marginBottom: 12, padding: 10, borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box' }}
-        />
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          type="password"
-          placeholder="Contraseña"
-          style={{ display: 'block', width: '100%', marginBottom: 12, padding: 10, borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box' }}
-        />
-        {error && <p style={{ color: '#b91c1c', fontSize: 14 }}>{error}</p>}
-        <button
-          type="submit"
-          disabled={cargando || !username.trim() || !password.trim()}
-          style={{ width: '100%', padding: 12, background: cargando ? '#9ca3af' : '#7d1620', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 'bold', cursor: cargando ? 'not-allowed' : 'pointer' }}
-        >
-          {cargando ? 'Ingresando...' : 'Ingresar'}
-        </button>
-      </form>
+    <div className="ops-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div className="ops-card" style={{ width: '100%', maxWidth: 380, padding: '40px 36px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 30 }}>
+          <img src="/logo.png" alt="Doña Zita" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--ops-border)', marginBottom: 16 }} />
+          <h1 style={{ fontFamily: 'var(--ops-font-display)', fontSize: '1.5rem', fontWeight: 700, margin: 0, color: 'var(--ops-ink)' }}>
+            Doña Zita
+          </h1>
+          <span style={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: 1.4, textTransform: 'uppercase', color: 'var(--ops-ink-soft)', marginTop: 4 }}>
+            Acceso de Personal
+          </span>
+        </div>
+
+        <form onSubmit={manejarSubmit}>
+          <label className="ops-label" htmlFor="login-usuario">Usuario</label>
+          <div style={{ position: 'relative', marginBottom: 18 }}>
+            <User size={17} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--ops-ink-soft)' }} />
+            <input
+              id="login-usuario"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Nombre de usuario"
+              autoFocus
+              className="ops-input"
+              style={{ paddingLeft: 38 }}
+            />
+          </div>
+
+          <label className="ops-label" htmlFor="login-password">Contraseña</label>
+          <div style={{ position: 'relative', marginBottom: 22 }}>
+            <Lock size={17} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--ops-ink-soft)' }} />
+            <input
+              id="login-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="••••••••"
+              className="ops-input"
+              style={{ paddingLeft: 38 }}
+            />
+          </div>
+
+          {error && (
+            <p style={{ color: 'var(--ops-danger)', fontSize: 13.5, marginTop: -10, marginBottom: 16 }}>{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={cargando || !username.trim() || !password.trim()}
+            className="ops-btn ops-btn--primary"
+            style={{ width: '100%', padding: '12px 18px' }}
+          >
+            {cargando ? 'Ingresando...' : 'Ingresar'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

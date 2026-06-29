@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import './MonitorCocina.css'
 import { apiFetch } from './utils/apiFetch'
+import { AlertCircle, AlertTriangle, Armchair, Ban, Check, CupSoda, Loader2, ShoppingBag, Timer } from 'lucide-react'
 
 function TemporizadorPedido({ fechaInicio, tiempoPrep }) {
   const [minutosRestantes, setMinutosRestantes] = useState('--')
@@ -45,8 +46,9 @@ function TemporizadorPedido({ fechaInicio, tiempoPrep }) {
   if (!fechaInicio) return null;
 
   return (
-    <span style={{ color: atrasado ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>
-      {atrasado ? `🚨 +${minutosRestantes}:${segundosRestantes}` : `⏱️ ${minutosRestantes}:${segundosRestantes}`}
+    <span className="timer-badge" style={{ color: atrasado ? '#e0867c' : '#7fc99b' }}>
+      {atrasado ? <AlertTriangle size={14} /> : <Timer size={14} />}
+      {atrasado ? `+${minutosRestantes}:${segundosRestantes}` : `${minutosRestantes}:${segundosRestantes}`}
     </span>
   )
 }
@@ -150,7 +152,7 @@ function MonitorCocina() {
         // Verificamos si el backend arrojó un error (Ej: Error 500)
         if (!respuesta.ok) {
           const errorDatos = await respuesta.json();
-          alert(`❌ Error del servidor: ${errorDatos.detail || 'Fallo desconocido'}`);
+          alert(`Error del servidor: ${errorDatos.detail || 'Fallo desconocido'}`);
           return; // Cortamos la ejecución para no recargar datos falsos
         }
       } else {
@@ -163,7 +165,7 @@ function MonitorCocina() {
     } catch (error) {
       // Capturamos si el backend está apagado o hay un problema de CORS
       console.error("Error de conexión:", error);
-      alert("❌ No se pudo conectar con el servidor. Revisa si FastAPI está encendido.");
+      alert("No se pudo conectar con el servidor. Revisa si FastAPI está encendido.");
     }
   }
 
@@ -189,7 +191,7 @@ function MonitorCocina() {
 
       if (!respuesta.ok) {
         const errorDatos = await respuesta.json()
-        alert(`❌ Error del servidor: ${errorDatos.detail || 'Fallo desconocido'}`)
+        alert(`Error del servidor: ${errorDatos.detail || 'Fallo desconocido'}`)
         return
       }
 
@@ -208,7 +210,7 @@ function MonitorCocina() {
       setItemReportando(null)
     } catch (error) {
       console.error("Error reportando problema:", error)
-      alert("❌ No se pudo conectar con el servidor.")
+      alert("No se pudo conectar con el servidor.")
     }
   }
 
@@ -223,13 +225,19 @@ function MonitorCocina() {
   return (
     <div className="monitor-cocina">
       <header className="cocina-header">
-        <h1>👨‍🍳 Monitor de Producción</h1>
+        <div className="ops-brand">
+          <img src="/logo.png" alt="Doña Zita" />
+          <div className="ops-brand-text">
+            <strong>Doña Zita</strong>
+            <small>Monitor de Cocina</small>
+          </div>
+        </div>
       </header>
 
       {cargando ? (
-        <p className="carga-texto">Sincronizando...</p>
+        <p className="carga-texto"><Loader2 size={18} className="animate-spin" /> Sincronizando...</p>
       ) : comandas.length === 0 ? (
-        <p className="vacio-texto">🎉 Cola vacía.</p>
+        <p className="vacio-texto"><Check size={18} /> Cola vacía.</p>
       ) : (
         <div className="comandas-grid">
           {comandas.map((comanda) => {
@@ -249,13 +257,15 @@ function MonitorCocina() {
                   <div className="comanda-cabecera-fila">
                     <span className="pedido-titulo">Pedido #{comanda.id_pedido}</span>
                     <span className="mesa-titulo">
-                      {comanda.id_mesa === 0 ? `🛍️ Llevar: ${comanda.cliente_nombre}` : `🪑 Paleta: ${comanda.id_mesa}`}
+                      {comanda.id_mesa === 0
+                        ? <><ShoppingBag size={13} /> Llevar: {comanda.cliente_nombre}</>
+                        : <><Armchair size={13} /> Paleta: {comanda.id_mesa}</>}
                     </span>
                   </div>
                   {comanda.fecha_inicio_global && (
                     <div className="comanda-cabecera-estado">
                       {comanda.solo_bebidas ? (
-                        <span className="badge-bebidas">🥤 Despacho Inmediato</span>
+                        <span className="badge-bebidas"><CupSoda size={14} /> Despacho inmediato</span>
                       ) : (
                         <TemporizadorPedido fechaInicio={comanda.fecha_inicio_global} tiempoPrep={comanda.tiempo_max_asignado} />
                       )}
@@ -270,7 +280,7 @@ function MonitorCocina() {
                         <span className="item-nombre">
                           <strong>{item.cantidad}x</strong> {item.plato_nombre}
                         </span>
-                        {item.especificaciones_ia && <span className="item-notas">⚠️ {item.especificaciones_ia}</span>}
+                        {item.especificaciones_ia && <span className="item-notas"><AlertCircle size={12} /> {item.especificaciones_ia}</span>}
                       </div>
 
                       <div className="item-acciones">
@@ -280,20 +290,20 @@ function MonitorCocina() {
                             className="btn-accion rechazar"
                             disabled={!esElTurno}
                           >
-                            ⚠️ Problema
+                            <AlertTriangle size={14} /> Problema
                           </button>
                         )}
 
                         {item.estado_item === 'PREPARANDO' && (
                           <>
                             <button onClick={() => manejarAccionItem(item.id_detalle, 'LISTO')} className="btn-accion listo">
-                              ✓ ¡Listo!
+                              <Check size={14} /> Listo
                             </button>
                             <button
                               onClick={() => abrirModalProblema(item.id_detalle, item.id_plato)}
                               className="btn-accion demorar"
                             >
-                              ⚠️ Reportar Problema
+                              <AlertTriangle size={14} /> Reportar problema
                             </button>
                           </>
                         )}
@@ -305,7 +315,7 @@ function MonitorCocina() {
                 {/* 🌟 TAREA 1/2: sección separada de incidentes, fuera de la vista activa */}
                 {itemsProblema.length > 0 && (
                   <div className="comanda-incidentes">
-                    <span className="incidentes-titulo">🚫 Incidentes</span>
+                    <span className="incidentes-titulo"><Ban size={13} /> Incidentes</span>
                     {itemsProblema.map((item) => (
                       <div key={item.id_detalle} className="item-fila item-fila--incidente">
                         <div className="item-info">
@@ -327,7 +337,7 @@ function MonitorCocina() {
       {itemReportando !== null && (
         <div className="modal-sobrecapa" onClick={() => setItemReportando(null)}>
           <div className="modal-contenido" onClick={(e) => e.stopPropagation()}>
-            <h2>🚨 Reportar Problema</h2>
+            <h2><AlertTriangle size={18} /> Reportar problema</h2>
             <p>¿Cuál es el problema con este plato?</p>
 
             <div className="modal-opciones">
