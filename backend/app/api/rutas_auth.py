@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from psycopg2.extras import RealDictCursor
 
 from app.core.database import get_db_connection
-from app.core.seguridad import crear_access_token, verificar_password
+from app.core.seguridad import crear_access_token, expiracion_para_rol, verificar_password
 from app.schemas.usuario_schema import Token, UsuarioOut
 
 router = APIRouter(tags=["Autenticación"])
@@ -35,11 +35,17 @@ def login(credenciales: OAuth2PasswordRequestForm = Depends()):
 
     # 🌟 id_usuario viaja en el token: permite registrar quién cobra cada
     # pedido (id_cajero) sin una consulta extra a la BD en /caja/cobrar.
-    access_token = crear_access_token({
-        "sub": usuario["username"],
-        "rol": usuario["rol"],
-        "id_usuario": usuario["id_usuario"],
-    })
+    # La duración del token depende del rol (ver expiracion_para_rol): los
+    # empleados tienen una ventana larga para no cortarse a mitad de turno;
+    # el navegador (sessionStorage) sigue siendo el verdadero "cierre de sesión".
+    access_token = crear_access_token(
+        {
+            "sub": usuario["username"],
+            "rol": usuario["rol"],
+            "id_usuario": usuario["id_usuario"],
+        },
+        expires_delta=expiracion_para_rol(usuario["rol"]),
+    )
 
     return Token(
         access_token=access_token,

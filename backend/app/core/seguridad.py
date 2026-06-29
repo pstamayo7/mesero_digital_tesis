@@ -20,7 +20,23 @@ from passlib.context import CryptContext
 # que el entorno de desarrollo funcione "out of the box".
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "doña-zita-clave-de-desarrollo-cambiar-en-produccion")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", str(8 * 60)))  # 8 horas
+
+# 🌟 Duración del token según rol. El frontend guarda el token en
+# sessionStorage (se borra solo al cerrar la pestaña/navegador), así que la
+# expiración del JWT es la segunda capa de seguridad, no la primera.
+# - empleado: ventana larga (24h) para que un turno largo/doble turno en hora
+#   pico nunca se corte por caducidad; en la práctica la sesión solo termina
+#   cuando cierran el navegador.
+# - administrador: ventana corta (8h, valor original) porque tiene acceso a
+#   todo el sistema y conviene forzar relogin más seguido.
+ACCESS_TOKEN_EXPIRE_MINUTES_EMPLEADO = int(os.getenv("JWT_EXPIRE_MINUTES_EMPLEADO", str(24 * 60)))
+ACCESS_TOKEN_EXPIRE_MINUTES_ADMIN = int(os.getenv("JWT_EXPIRE_MINUTES_ADMIN", str(8 * 60)))
+ACCESS_TOKEN_EXPIRE_MINUTES = ACCESS_TOKEN_EXPIRE_MINUTES_ADMIN  # compat: valor por defecto si no se especifica rol
+
+
+def expiracion_para_rol(rol: str) -> timedelta:
+    minutos = ACCESS_TOKEN_EXPIRE_MINUTES_ADMIN if rol == "administrador" else ACCESS_TOKEN_EXPIRE_MINUTES_EMPLEADO
+    return timedelta(minutes=minutos)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
