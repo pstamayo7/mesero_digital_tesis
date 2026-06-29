@@ -830,33 +830,6 @@ function Kiosko() {
 
       </div>
 
-      {/* ===================== BARRA DE CONFIANZA ===================== */}
-      <div className="dz-trust">
-        <div className="dz-trust-inner">
-          <div className="dz-trust-item">
-            <span className="dz-trust-ico">🎙️</span>
-            <div>
-              <div className="dz-trust-strong">Pide por voz</div>
-              <div className="dz-trust-soft">Rápido y fácil</div>
-            </div>
-          </div>
-          <div className="dz-trust-item">
-            <span className="dz-trust-ico">🛡️</span>
-            <div>
-              <div className="dz-trust-strong">Ingredientes frescos</div>
-              <div className="dz-trust-soft">Calidad garantizada</div>
-            </div>
-          </div>
-          <div className="dz-trust-item">
-            <span className="dz-trust-ico">❤️</span>
-            <div>
-              <div className="dz-trust-strong">Hecho con amor</div>
-              <div className="dz-trust-soft">Tradición que se saborea</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* ===================== BARRA FLOTANTE CARRITO ===================== */}
       {carrito.length > 0 && (
         <div className="dz-cta-bar">

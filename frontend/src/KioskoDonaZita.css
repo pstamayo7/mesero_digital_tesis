@@ -378,45 +378,6 @@
 }
 
 /* ----------------------------------------------------------------- */
-/* Barra de confianza (pie)                                          */
-/* ----------------------------------------------------------------- */
-.dz-trust {
-  margin-top: 40px;
-  background: linear-gradient(160deg, var(--dz-red-800), var(--dz-red-950));
-  color: #fff;
-  border-top-left-radius: 40px;
-  border-top-right-radius: 40px;
-  padding: 26px 18px 30px;
-}
-.dz-trust-inner {
-  max-width: 880px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-.dz-trust-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: center;
-}
-.dz-trust-ico {
-  width: 46px; height: 46px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 1.2rem;
-  background: rgba(255,255,255,0.08);
-  border: 1.5px solid rgba(243,198,77,0.5);
-}
-.dz-trust-strong { font-weight: 800; line-height: 1.1; }
-.dz-trust-soft { font-size: 0.82rem; color: rgba(255,255,255,0.7); }
-@media (max-width: 640px) {
-  .dz-trust-inner { grid-template-columns: 1fr; }
-}
-
-/* ----------------------------------------------------------------- */
 /* Barra flotante "IR AL CARRITO"                                    */
 /* ----------------------------------------------------------------- */
 .dz-cta-bar {
