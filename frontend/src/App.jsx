@@ -14,33 +14,10 @@ import RutaProtegida from './RutaProtegida';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './OpsTheme.css';
 
-// Rutas de cara al cliente: conservan exactamente la barra técnica original
-// (el "simulador de múltiples terminales" de la tesis). Todo lo demás es
-// personal interno y usa la barra elegante de Operaciones.
-const RUTAS_CLIENTE = ['/', '/turnos'];
-
-function BarraTecnicaOriginal() {
-  const linkStyle = { color: '#f8fafc', textDecoration: 'none', fontWeight: 'bold', fontSize: '1rem' };
-  const adminStyle = { ...linkStyle, color: '#10b981' };
-
-  return (
-    <nav style={{
-      background: '#1e293b', padding: '15px', display: 'flex', gap: '25px',
-      justifyContent: 'center', alignItems: 'center', borderBottom: '3px solid #334155', flexWrap: 'wrap'
-    }}>
-      <Link to="/" style={linkStyle}>📱 Vista Kiosko</Link>
-      <Link to="/cocina" style={linkStyle}>👨‍🍳 Monitor Cocina</Link>
-      <Link to="/turnos" style={linkStyle}>📺 Pantalla Turnos</Link>
-      <Link to="/caja" style={adminStyle}>💵 Caja / Cobros</Link>
-      <Link to="/AdminDashboard" style={adminStyle}>⚙️ Administración</Link>
-    </nav>
-  );
-}
-
 // 🔒 Barra superior de Operaciones: identidad de marca + navegación entre
-// estaciones + sesión activa. Reemplaza la barra técnica solo fuera del
-// Kiosko/Turnos.
-function BarraOperaciones() {
+// estaciones + sesión activa. Misma barra en TODAS las pantallas (Kiosko,
+// Turnos, Cocina, Caja, Administración) para que el sistema se vea uniforme.
+function BarraNavegacion() {
   const { usuario, logout } = useAuth();
   const location = useLocation();
 
@@ -66,9 +43,9 @@ function BarraOperaciones() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <Link to="/" style={enlaceEstilo('__kiosko__')}><Smartphone size={15} /> Kiosko</Link>
+        <Link to="/" style={enlaceEstilo('/')}><Smartphone size={15} /> Kiosko</Link>
         <Link to="/cocina" style={enlaceEstilo('/cocina')}><ChefHat size={15} /> Cocina</Link>
-        <Link to="/turnos" style={enlaceEstilo('__turnos__')}><MonitorPlay size={15} /> Turnos</Link>
+        <Link to="/turnos" style={enlaceEstilo('/turnos')}><MonitorPlay size={15} /> Turnos</Link>
         <Link to="/caja" style={enlaceEstilo('/caja')}><CreditCard size={15} /> Caja</Link>
         <Link to="/AdminDashboard" style={enlaceEstilo('/AdminDashboard')}><LayoutDashboard size={15} /> Administración</Link>
       </div>
@@ -91,12 +68,6 @@ function BarraOperaciones() {
       </div>
     </nav>
   );
-}
-
-function BarraNavegacion() {
-  const location = useLocation();
-  const esRutaCliente = RUTAS_CLIENTE.includes(location.pathname);
-  return esRutaCliente ? <BarraTecnicaOriginal /> : <BarraOperaciones />;
 }
 
 function App() {
